@@ -59,10 +59,11 @@ program
   .option('--hub-slug <slug>', 'override the V3 hub slug from the plan')
   .option('--publish-held', 'publish pages the fail-closed rule would hold; the report lists them as published-ungated', false)
   .option('--accept-plan-change', 'with --resume: continue although the plan hash changed since the run started', false)
+  .option('--rewrite-pages', 'with --accept-plan-change: rewrite and republish page trees that changed; other kinds must still match', false)
   .action(async (opts: {
     profile: string; plan: string; mode: string; dryRun: boolean; resume?: string;
     checkAccess: boolean; assetsOnly: boolean; breakLock: boolean; allowCatalogDrift: boolean;
-    cleanupOrphans: boolean; confirm: boolean; skipAssets: boolean; hubSlug?: string; publishHeld: boolean; acceptPlanChange: boolean;
+    cleanupOrphans: boolean; confirm: boolean; skipAssets: boolean; hubSlug?: string; publishHeld: boolean; acceptPlanChange: boolean; rewritePages: boolean;
   }) => {
     await runApply({
       planPath: opts.plan,
@@ -80,6 +81,7 @@ program
       hubSlug: opts.hubSlug ?? null,
       publishHeld: opts.publishHeld,
       acceptPlanChange: opts.acceptPlanChange,
+      rewritePages: opts.rewritePages,
     });
   });
 

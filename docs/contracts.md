@@ -86,3 +86,8 @@ header the route accepts, if any.
 - **The catalog has no page-level templates.** The root node's `template`
   (`page-generic`, `page-content`, ...) is not in the catalog and the backend
   does not validate it; sections below the root must carry catalog templates.
+- **`--accept-plan-change` refuses when any done entry would differ under the
+  new plan.** `--rewrite-pages` relaxes that for page trees only: differing
+  trees are rewritten (If-Match on draft_version) and republished, which is how
+  a content mapping fix reaches a hub that is already applied. Every other kind
+  must still hash identically.

@@ -7,7 +7,7 @@ describe('runApply, scope guards', () => {
       runApply({
         planPath: 'plans/x.json', profileName: 'test', mode: 'upsert', dryRun: true,
         resumeRunId: null, checkAccess: false, assetsOnly: false, breakLock: false,
-        allowCatalogDrift: false, cleanupOrphans: false, confirm: false, skipAssets: false, hubSlug: null, publishHeld: false, acceptPlanChange: false,
+        allowCatalogDrift: false, cleanupOrphans: false, confirm: false, skipAssets: false, hubSlug: null, publishHeld: false, acceptPlanChange: false, rewritePages: false,
       }),
     ).rejects.toThrow('--mode upsert is M3; only --mode fresh is implemented');
   });
@@ -17,7 +17,7 @@ describe('runApply, scope guards', () => {
       runApply({
         planPath: 'plans/x.json', profileName: 'test', mode: 'fresh', dryRun: true,
         resumeRunId: null, checkAccess: false, assetsOnly: true, breakLock: false,
-        allowCatalogDrift: false, cleanupOrphans: false, confirm: false, skipAssets: false, hubSlug: null, publishHeld: false, acceptPlanChange: false,
+        allowCatalogDrift: false, cleanupOrphans: false, confirm: false, skipAssets: false, hubSlug: null, publishHeld: false, acceptPlanChange: false, rewritePages: false,
       }),
     ).rejects.toThrow('--assets-only needs --resume');
   });
@@ -27,7 +27,7 @@ describe('runApply, scope guards', () => {
       runApply({
         planPath: 'plans/x.json', profileName: 'test', mode: 'fresh', dryRun: true,
         resumeRunId: 'run-1', checkAccess: false, assetsOnly: true, breakLock: false,
-        allowCatalogDrift: false, cleanupOrphans: false, confirm: false, skipAssets: true, hubSlug: null, publishHeld: false, acceptPlanChange: false,
+        allowCatalogDrift: false, cleanupOrphans: false, confirm: false, skipAssets: true, hubSlug: null, publishHeld: false, acceptPlanChange: false, rewritePages: false,
       }),
     ).rejects.toThrow('contradict');
   });

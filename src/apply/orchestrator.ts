@@ -49,6 +49,8 @@ export interface ApplyOptions {
   publishHeld: boolean;
   /** With --resume: accept a plan whose hash differs from the ledger's, after a mapper fix. */
   acceptPlanChange: boolean;
+  /** With --accept-plan-change: page trees may differ; they are rewritten and republished. Every other kind must still match. */
+  rewritePages: boolean;
 }
 
 /** Every entity kind apply may touch, checked against docs/contracts.md at startup. */
@@ -225,7 +227,13 @@ export async function runApply(options: ApplyOptions): Promise<string> {
 
   if (options.resumeRunId && store.header.planHash !== header.planHash) {
     // --accept-plan-change: every entry already done must hash identically under the new plan.
-    const differing = doneEntriesDiffering(ctx);
+    const allDiffering = doneEntriesDiffering(ctx);
+    const differing = options.rewritePages ? allDiffering.filter((d) => d.kind !== 'page') : allDiffering;
+    if (options.rewritePages) {
+      logger.warn('--rewrite-pages: page trees that differ under the new plan will be rewritten and republished', {
+        pages: allDiffering.filter((d) => d.kind === 'page').length,
+      });
+    }
     if (differing.length > 0) {
       lock.release();
       clearInterval(heartbeat);
