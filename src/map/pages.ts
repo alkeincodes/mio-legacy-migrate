@@ -138,6 +138,7 @@ export function mapPages(bundle: Bundle): {
       resolvePageSlug,
       pageSlugById: (legacyPageId) => slugByPage.get(legacyPageId) ?? null,
       mediaIdForSection: (s) => (s.model_type === MORPH_FILE && s.model_id !== null ? mediaByFileId.get(s.model_id) ?? null : null),
+      assetForUrl: (url) => assetByUrl.get(url) ?? null,
       mapElement: (section, ordinal) =>
         mapElement(section, ordinal, {
           legacyHubId: bundle.header.legacyHubId,

@@ -1,0 +1,163 @@
+{
+  "kind": "container",
+  "template": "grid",
+  "settings": {
+    "maxWidth": "content",
+    "padding": 0,
+    "surface": {
+      "padding": "section"
+    }
+  },
+  "dataSource": {
+    "id": "",
+    "type": "playlist"
+  },
+  "children": [
+    {
+      "kind": "stack",
+      "settings": {
+        "gap": 8,
+        "mobileGap": 6
+      },
+      "children": [
+        {
+          "kind": "row",
+          "settings": {
+            "align": "start",
+            "gap": 5,
+            "maxWidth": 800,
+            "mobileGap": 3
+          },
+          "children": [
+            {
+              "kind": "progress-ring",
+              "settings": {
+                "mobileSize": 60,
+                "size": 76,
+                "valueFrom": "progressPercent"
+              }
+            },
+            {
+              "kind": "stack",
+              "settings": {
+                "align": "start",
+                "gap": 2.5,
+                "grow": true,
+                "mobileGap": 1.5,
+                "px": 0.5
+              },
+              "children": [
+                {
+                  "kind": "field",
+                  "settings": {
+                    "actionFromScope": "action",
+                    "name": "title",
+                    "role": "title",
+                    "size": "title",
+                    "weight": 700
+                  }
+                },
+                {
+                  "kind": "row",
+                  "settings": {
+                    "align": "center",
+                    "gap": 2.5
+                  },
+                  "children": [
+                    {
+                      "kind": "field",
+                      "settings": {
+                        "icon": "calendar",
+                        "name": "scheduledDate",
+                        "optional": true,
+                        "role": "meta"
+                      }
+                    },
+                    {
+                      "kind": "field",
+                      "settings": {
+                        "icon": "content",
+                        "name": "contentCountLabel",
+                        "optional": true,
+                        "role": "meta"
+                      }
+                    },
+                    {
+                      "kind": "field",
+                      "settings": {
+                        "icon": "clock",
+                        "name": "duration",
+                        "optional": true,
+                        "role": "meta"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "kind": "field",
+                  "settings": {
+                    "clamp": 3,
+                    "name": "description",
+                    "optional": true,
+                    "role": "body",
+                    "size": "body-small"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "grid",
+          "settings": {
+            "variant": "responsive"
+          },
+          "dataSource": {
+            "id": "",
+            "type": "playlist"
+          },
+          "repeat": {
+            "over": "dataSource"
+          },
+          "children": [
+            {
+              "kind": "content-card",
+              "template": "content-card",
+              "settings": {
+                "actionFromScope": "action"
+              },
+              "children": [
+                {
+                  "kind": "media-slot",
+                  "settings": {
+                    "aspectRatio": "16:9",
+                    "name": "cover",
+                    "outline": true,
+                    "radius": "m"
+                  }
+                },
+                {
+                  "kind": "stack",
+                  "settings": {
+                    "gap": 0.5
+                  },
+                  "children": [
+                    {
+                      "kind": "field",
+                      "settings": {
+                        "name": "title",
+                        "role": "title",
+                        "size": "body",
+                        "weight": 700
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { logger } from '../log/logger.js';
 import { TOOL_VERSION } from '../version.js';
 import { fetchCatalog, validateTree } from '../map/catalog.js';
 import { mapBranding } from '../map/branding.js';
+import { dominantButtonColour } from '../map/style.js';
 import { mapNavigation } from '../map/navigation.js';
 import { mapPages } from '../map/pages.js';
 import { isSegmentMappable } from '../map/visibility.js';
@@ -34,11 +35,12 @@ export async function runMap(options: MapOptions): Promise<string> {
   const { navigation, warnings: navWarnings } = mapNavigation(bundle, slugByPageId);
   warnings.push(...navWarnings);
 
-  const { branding, warnings: brandingWarnings } = mapBranding(
+  const { branding, hubSettings, warnings: brandingWarnings } = mapBranding(
     bundle.theme,
     bundle.media.filter((m) => m.model_type === MORPH_HUB),
     bundle.header.legacyCdnUrl ?? process.env['LEGACY_CDN_URL'] ?? '',
     bundle.header.legacyS3Url ?? process.env['LEGACY_S3_URL'] ?? '',
+    { dominantButton: dominantButtonColour(bundle.sections) },
   );
   warnings.push(...brandingWarnings);
 
@@ -78,6 +80,7 @@ export async function runMap(options: MapOptions): Promise<string> {
       isPrivate: bundle.hub.auth === 1,
     },
     branding,
+    hubSettings,
     pages,
     playlists: bundle.playlists.map((p) => ({
       legacyPlaylistId: p.id,

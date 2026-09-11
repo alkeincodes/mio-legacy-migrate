@@ -81,3 +81,17 @@ describe('mapBranding', () => {
     expect(warnings.some((w) => w.reason.includes('https'))).toBe(true);
   });
 });
+
+describe('theme mode and primary', () => {
+  it('forces the custom theme mode so the legacy page colours apply, and copies the background to the header', () => {
+    const { branding, hubSettings } = mapBranding(theme({ colors: { background: '#333333', text: '#FAFAFA', primary: '#F7F2E8' }, darkMode: true }), [], CDN, S3);
+    expect(hubSettings).toEqual({ background: { type: 'custom' } });
+    expect(branding['header_color']).toBe('#333333');
+  });
+
+  it('uses the dominant legacy button colour as the V3 primary, and says so', () => {
+    const { branding, warnings } = mapBranding(theme({ colors: { primary: '#F7F2E8' } }), [], CDN, S3, { dominantButton: { background: '#5770D1', text: '#F7F2E8' } });
+    expect(branding['primary']).toBe('#5770D1');
+    expect(warnings.some((w) => w.reason.includes('#5770D1'))).toBe(true);
+  });
+});

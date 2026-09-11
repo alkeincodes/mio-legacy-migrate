@@ -29,7 +29,7 @@ describe('mapElement', () => {
       id: nodeId(7, 100, 21000, 0),
       kind: 'headline',
       value: 'Build better men',
-      settings: { level: 2, align: 'center' },
+      settings: { level: 2, weight: 700, size: 'large-title', align: 'center' },
     });
   });
 

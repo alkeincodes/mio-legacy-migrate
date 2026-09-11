@@ -115,6 +115,8 @@ export interface Plan {
   pageSlugRenames?: Array<{ legacySlug: string; slug: string; legacyPageId: number }>;
   hub: PlanHub;
   branding: Record<string, string>;
+  /** Hub settings apply merges over the target (theme mode); absent on older plans. */
+  hubSettings?: Record<string, unknown>;
   pages: PlanPage[];
   playlists: PlanPlaylist[];
   folders: PlanFolder[];

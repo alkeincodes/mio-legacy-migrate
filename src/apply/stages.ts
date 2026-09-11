@@ -209,14 +209,20 @@ export async function hubStage(ctx: StageContext): Promise<string> {
 
 export async function brandingStage(ctx: StageContext): Promise<void> {
   const keys = Object.keys(ctx.plan.branding);
-  if (keys.length === 0) return;
-  const hub = await ctx.api.get<unknown>(`${team(ctx)}/hubs/${ctx.hubId}`);
+  const settingsKeys = Object.keys(ctx.plan.hubSettings ?? {});
+  if (keys.length === 0 && settingsKeys.length === 0) return;
+  const hub = await ctx.api.get<{ data?: { attributes?: { settings?: Record<string, unknown> } } }>(`${team(ctx)}/hubs/${ctx.hubId}`);
+  // The hub PATCH replaces the settings blob, so merge over what is there (registration stays as apply set it).
+  const current = hub.body?.data?.attributes?.settings ?? {};
+  const attributes: Record<string, unknown> = {};
+  if (keys.length > 0) attributes['branding'] = ctx.plan.branding;
+  if (settingsKeys.length > 0) attributes['settings'] = { ...current, ...ctx.plan.hubSettings };
   await ctx.api.patch(
     `${team(ctx)}/hubs/${ctx.hubId}`,
-    { data: { type: 'hubs', attributes: { branding: ctx.plan.branding } } },
+    { data: { type: 'hubs', attributes } },
     { ifMatch: hub.etag ?? undefined, op: 'hubs.update' },
   );
-  logger.info('branding written', { keys: keys.length });
+  logger.info('branding written', { keys: keys.length, settingsKeys });
 }
 
 // ---------------------------------------------------------------- segments

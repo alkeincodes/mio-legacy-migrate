@@ -4,6 +4,7 @@ import { SECTION_TABLE, lookupMapping } from '../../src/map/sectionTable.js';
 import { assetRef, mapSection, playlistRef, type MapContext } from '../../src/map/sections.js';
 import { nodeId } from '../../src/map/nodeId.js';
 import type { LegacySection } from '../../src/extract/queries.js';
+import type { CatalogNode } from '../../src/map/catalog.js';
 import type { PlanWarning } from '../../src/map/plan.js';
 
 interface Fixture {
@@ -68,24 +69,43 @@ describe('mapSection, container level', () => {
     expect(surface['background']).toEqual({ type: 'custom-color', value: '#101820' });
   });
 
-  it('maps a column block to a stack carrying the legacy width', () => {
+  it('lays columns out in the catalog row recipe: a layout row of stacks carrying the legacy width', () => {
     const fixture = loadFixture('row');
     const node = mapSection(fixture.section, 0, contextFor(fixture, []));
-    const column = node.children?.[0];
+    const layout = node.children?.[0];
+    expect(layout?.kind).toBe('row');
+    expect(layout?.settings).toMatchObject({ responsive: true, wrap: true });
+    const column = layout?.children?.[0];
     expect(column?.kind).toBe('stack');
     expect(column?.template).toBeUndefined();
     expect(column?.settings?.['width']).toBe('1/2');
     expect(column?.id).toBe(nodeId(7, 100, 11101, 0));
   });
 
-  it('maps a grid-playlist block to a repeated content-card bound to the playlist', () => {
+  it('turns a numeric legacy column size into the width enum', () => {
+    const fixture = loadFixture('row');
+    const column = { ...fixture.children[0]!, settings: JSON.stringify({ size: 33.333 }) };
+    const node = mapSection(fixture.section, 0, contextFor({ ...fixture, children: [column] }, []));
+    expect(node.children?.[0]?.children?.[0]?.settings?.['width']).toBe('1/3');
+  });
+
+  it('carries the section surface the recipe expects: padding, background, maxWidth', () => {
+    const fixture = loadFixture('row');
+    const node = mapSection(fixture.section, 0, contextFor(fixture, []));
+    expect(node.settings).toMatchObject({ maxWidth: 'content', padding: 0, surface: { padding: 'sm', background: { type: 'custom-color', value: '#101820' } } });
+  });
+
+  it('maps a grid of one playlist onto the catalog playlist-grid recipe bound to that playlist', () => {
     const fixture = loadFixture('grid-playlist');
     const node = mapSection(fixture.section, 1, contextFor(fixture, []));
     expect(node.template).toBe('grid');
-    const card = node.children?.[0];
-    expect(card?.kind).toBe('content-card');
-    expect(card?.dataSource).toEqual({ type: 'playlist', id: playlistRef(42) });
-    expect(card?.repeat).toEqual({ over: 'dataSource' });
+    expect(node.dataSource).toEqual({ type: 'playlist', id: playlistRef(42) });
+    const walk = (n: CatalogNode): CatalogNode[] => [n, ...(n.children ?? []).flatMap(walk)];
+    const repeated = walk(node).find((n) => n.repeat);
+    expect(repeated?.dataSource).toEqual({ type: 'playlist', id: playlistRef(42) });
+    expect(walk(node).some((n) => n.kind === 'media-slot')).toBe(true);
+    const ids = walk(node).map((n) => n.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('never sets both value and children on a container', () => {
@@ -120,7 +140,7 @@ describe('mapSection, container level', () => {
     const fixture = loadFixture('row');
     const hidden: LegacySection = { ...fixture.section, hidden: 1 };
     const node = mapSection(hidden, 0, contextFor({ ...fixture, section: hidden }, []));
-    expect(node.settings?.['surface']).toMatchObject({ visibility: { hidden: true } });
+    expect(node.settings?.['surface']).toMatchObject({ visibility: { desktop: false, mobile: false } });
   });
 });
 
@@ -162,7 +182,7 @@ describe('page and url cards with real legacy shapes', () => {
     const fixture = loadFixture('grid-page');
     const card = { ...fixture.children[0]!, model_type: 'App\\Page', model_id: 284465, settings: JSON.stringify({ link: { label: 'Start' } }) };
     const node = mapSection(fixture.section, 0, { ...contextFor({ ...fixture, children: [card] }, []), pageSlugById: (id) => (id === 284465 ? 'start-here' : null) });
-    const button = node.children?.[0]?.children?.[0];
+    const button = node.children?.[0]?.children?.[0]?.children?.find((c) => c.kind === 'button');
     expect(button?.value).toBe('Start');
     expect(button?.settings?.['action']).toEqual({ type: 'page', value: '/start-here' });
   });
@@ -171,7 +191,7 @@ describe('page and url cards with real legacy shapes', () => {
     const fixture = loadFixture('grid-url');
     const doc = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'https://x.example.com/a' }] }] });
     const card = { ...fixture.children[0]!, settings: JSON.stringify({ link: { url: doc, label: 'Go', newTab: true } }) };
-    const button = mapSection(fixture.section, 0, contextFor({ ...fixture, children: [card] }, [])).children?.[0]?.children?.[0];
+    const button = mapSection(fixture.section, 0, contextFor({ ...fixture, children: [card] }, [])).children?.[0]?.children?.[0]?.children?.find((c) => c.kind === 'button');
     expect(button?.settings?.['action']).toEqual({ type: 'url', value: 'https://x.example.com/a' });
     expect(button?.settings?.['newTab']).toBe(true);
   });
@@ -181,6 +201,6 @@ describe('file cards', () => {
   it('reference the asset rather than the legacy file id, which V3 would 404 on', () => {
     const fixture = loadFixture('grid-file');
     const node = mapSection(fixture.section, 0, { ...contextFor(fixture, []), mediaIdForSection: () => 91234 });
-    expect(node.children?.[0]?.dataSource).toEqual({ type: 'file', id: 'ledger://asset/91234/original' });
+    expect(node.children?.[0]?.children?.[0]?.dataSource).toEqual({ type: 'file', id: 'ledger://asset/91234/original' });
   });
 });

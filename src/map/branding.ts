@@ -20,8 +20,10 @@ export function mapBranding(
   hubMedia: LegacyMedia[],
   cdnUrl: string,
   s3Url: string,
-): { branding: Record<string, string>; warnings: PlanWarning[] } {
+  opts: { dominantButton?: { background: string; text: string } | null } = {},
+): { branding: Record<string, string>; hubSettings: Record<string, unknown>; warnings: PlanWarning[] } {
   const branding: Record<string, string> = {};
+  const hubSettings: Record<string, unknown> = {};
   const warnings: PlanWarning[] = [];
 
   if (!theme) {
@@ -60,6 +62,26 @@ export function mapBranding(
       }
     }
     if (settings['darkMode'] === true) branding['dark_mode'] = 'true';
+
+    // V3 lets the viewer pick light or dark unless the hub forces `custom`, which
+    // is the only mode where branding.background and branding.text apply. A legacy
+    // theme with its own page colours is exactly that, so force it.
+    if (branding['background'] || branding['text']) {
+      hubSettings['background'] = { type: 'custom' };
+      if (branding['background']) branding['header_color'] = branding['background'];
+    }
+
+    // Legacy buttons carry their own colours; V3 buttons take the hub primary. When
+    // the hub's buttons agree on one colour, that is what members see as primary.
+    if (opts.dominantButton) {
+      const legacyPrimary = branding['primary'];
+      branding['primary'] = opts.dominantButton.background;
+      warnings.push(
+        warn(
+          `V3 primary set to ${opts.dominantButton.background}, the colour most legacy buttons carry; the legacy theme primary ${legacyPrimary ?? '(unset)'} is not a button colour on this hub`,
+        ),
+      );
+    }
   }
 
   for (const media of hubMedia) {
@@ -75,5 +97,5 @@ export function mapBranding(
     branding[key] = url;
   }
 
-  return { branding, warnings };
+  return { branding, hubSettings, warnings };
 }

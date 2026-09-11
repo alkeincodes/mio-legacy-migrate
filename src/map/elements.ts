@@ -5,6 +5,7 @@ import { nodeId } from './nodeId.js';
 import type { PlanWarning } from './plan.js';
 import { assetRef, playlistRef } from './sections.js';
 import { docToHtml, docToText, hasPersonalisation, parseDoc } from './tiptap.js';
+import { buttonSettingsFor, headlineSettingsFor, imageSettingsFor, textSettingsFor } from './style.js';
 
 export interface ElementContext {
   legacyHubId: number;
@@ -25,13 +26,6 @@ export interface ElementContext {
 
 function parseSettings(raw: unknown): Record<string, unknown> {
   return parseJsonObject(raw);
-}
-
-/** Legacy headline sizes; the editor collapses subHeadline into headline + size medium. */
-function headlineLevel(size: unknown): number {
-  if (size === 'medium') return 3;
-  if (size === 'small') return 4;
-  return 2;
 }
 
 /**
@@ -87,17 +81,14 @@ export function mapElement(
     case 'headline': {
       const doc = parseDoc(section.title);
       warnPersonalisation(doc);
-      const isSubheadline = /^subheadline/i.test(section.label ?? '');
-      const out: Record<string, unknown> = { level: isSubheadline ? 3 : headlineLevel(settings['size']) };
-      if (typeof settings['align'] === 'string') out['align'] = settings['align'];
-      return { id, kind: 'headline', value: doc ? docToText(doc) : content, settings: out };
+      const isSubheadline = /^subheadline/i.test(section.label ?? '') || settings['size'] === 'medium';
+      return { id, kind: 'headline', value: doc ? docToText(doc) : content, settings: headlineSettingsFor(settings, isSubheadline) };
     }
 
     case 'text': {
       const doc = parseDoc(settings['value']);
       warnPersonalisation(doc);
-      const out: Record<string, unknown> = {};
-      if (typeof settings['align'] === 'string') out['align'] = settings['align'];
+      const out = textSettingsFor(settings);
       // The V3 text node renders its value as plain text (tags show literally), so
       // the document is flattened; bold, links and lists are lost and reported.
       if (doc && /<(strong|em|u|a |ul|ol)/.test(docToHtml(doc))) {
@@ -107,8 +98,7 @@ export function mapElement(
     }
 
     case 'image': {
-      const out: Record<string, unknown> = { alt: section.title ?? '' };
-      if (settings['align'] === 'center') out['alignX'] = 'center';
+      const out = imageSettingsFor(settings, section.title ?? '');
       // The legacy image element shows settings.thumbnail.url (a Hub-owned media
       // conversion), even when it also links a File, and that File may be a video.
       // So the thumbnail comes first and the linked File's original is the fallback.
@@ -175,12 +165,7 @@ export function mapElement(
       } else {
         action = actionFor(url, ctx.hubOrigins ?? HUB_ORIGINS, ctx.resolvePageSlug);
       }
-      return {
-        id,
-        kind: 'button',
-        value: label,
-        settings: { action, variant: 'primary', newTab: link?.['newTab'] === true },
-      };
+      return { id, kind: 'button', value: label, settings: buttonSettingsFor(settings, action, link?.['newTab'] === true) };
     }
 
     case 'line-break':
