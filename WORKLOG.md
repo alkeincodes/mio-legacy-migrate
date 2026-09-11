@@ -112,3 +112,35 @@ Still not run: `extract --s3-only`, `apply --check-access`, any real apply,
   pending-copy, 421 pending-import, 26 publish, 5 publish-ungated, URL
   https://hub.member.dev/alliance. Plan warnings back to 13, 0 dropped.
 - Latest pinned plan: plans/hub-38827-25f604b168ef.json. Still no real apply.
+
+## 2026-09-12, first real apply on mantalks-prod
+
+Run `run-2026-09-11T19-49-29-036Z-b3f055c6`, `apply --skip-assets
+--publish-held --hub-slug alliance`. Hub 01a09204-a0ac-76e2-9658-cc9bc9e1b42f
+at https://hub.member.dev/alliance (slug assigned as requested).
+
+Three stops on the way, each fixed and resumed under `--accept-plan-change`
+(which refuses unless every done entry hashes identically under the new
+plan): page slug `onboarding` reserved (the backend reserves 23 slugs; now
+mirrored exactly in the mapper), then `discussions`, then the `content` page
+must be V3 type `content` at slug `content`. Final ledger: hub 1, folders 19,
+playlists 67, pages 31 (26 published, 5 published-ungated), spaces 64,
+achievements 4, assets 62 legacy-linked / 2582 pending-copy / 421
+pending-import, 0 intent. 1196 run warnings (1163 asset-pending playlist
+items, 28 approximated, 5 access-unmapped).
+
+Verify: pages 31/31, playlists 67/67, folders 19/19 on target; every page's
+published tree digest matches the ledger except `/content`, whose published
+tree reads as empty (V3 renders the content page itself). Not accepted:
+- the 4 browser playback checks failed, and the V3 side of the contact sheet
+  shows the login wall. The verify user v3demo is a team admin, not a hub
+  member; hub member login is the contact identity. A member login for the
+  verify user (or a test member) is needed before the contact sheet and
+  playback checks mean anything.
+- authorization checks skipped: the two test members do not exist.
+Artifacts (local, gitignored): runs/<runId>/report.md, contact-sheet.html
+(124 shots, legacy side logged in correctly), playback.json,
+published-ungated.json, apply-warnings.json.
+
+Next: a hub member identity for verify; `apply --assets-only --resume <run>`
+once the V3 AWS pair is in .env; then re-verify.
