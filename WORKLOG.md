@@ -247,3 +247,15 @@ with `dark_mode` now a boolean and Mulish mapped to `font_heading`/`font_body`.
 
 Plan `plans/hub-38827-ebc05c331c95.json`: 27 pages, 4 excluded, 3 tags, 5
 segments, 12 rules, 26 published gated, 1 published ungated (home-archived).
+
+Applied for real on 2026-09-12 (lead's GO): resumed run
+run-2026-09-11T19-49-29-036Z-b3f055c6 with the plan above, exit 0. Ledger:
+tags 3, segments 5, rules 12, pages 26 published gated + 1 published ungated
+(home-archived) + 4 removed (onboarding, login, register, discussions), hub
+homepage descriptor set to home-page, header now #878C6A / #F7F2E8, Mulish.
+Verify: pages 27/27, playlists 67/67, folders 19/19, playback 2/2, authz
+skipped (no test members), one failure: /content shows 0 sections on the
+target (the exemption decision is still with the user). Contact sheet skipped
+(assets pending 2969). The hub member alkein@membership.io joined under 30
+days ago and so sees the First 30 Days hero; a member older than 30 days or
+tagged mantalks-team sees the other one.
