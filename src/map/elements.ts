@@ -3,7 +3,8 @@ import { parseJsonObject } from '../extract/json.js';
 import type { CatalogNode } from './catalog.js';
 import { nodeId } from './nodeId.js';
 import type { PlanWarning } from './plan.js';
-import { assetRef } from './sections.js';
+import { assetRef, playlistRef } from './sections.js';
+import { docToHtml, docToText, hasPersonalisation, parseDoc } from './tiptap.js';
 
 export interface ElementContext {
   legacyHubId: number;
@@ -18,6 +19,8 @@ export interface ElementContext {
   assetForUrl?(url: string): { legacyMediaId: number; variant: string } | null;
   /** The V3 slug for a legacy page slug, when the mapper renamed it (reserved or duplicate). */
   resolvePageSlug?(legacySlug: string): string;
+  /** The V3 slug of a legacy page by id, for buttons whose target is a page row. */
+  pageSlugById?(legacyPageId: number): string | null;
 }
 
 function parseSettings(raw: unknown): Record<string, unknown> {
@@ -64,19 +67,38 @@ export function mapElement(
 
   const id = nodeId(ctx.legacyHubId, ctx.legacyPageId, section.id, ordinal);
   const settings = parseSettings(section.settings);
+  // On the real hub `label` is the element's display name ("Headline", "Paragraph",
+  // "Button"); the text lives in a TipTap document in `title` (headline),
+  // `settings.value` (paragraph) or `settings.link.label` (button). A row with no
+  // document falls back to the label, which is what the fixtures carry.
   const content = section.label ?? section.title ?? '';
+  const warnPersonalisation = (doc: ReturnType<typeof parseDoc>): void => {
+    if (doc && hasPersonalisation(doc)) {
+      ctx.warn({
+        pageSlug: ctx.pageSlug,
+        legacySectionId: section.id,
+        type: 'approximated',
+        reason: 'legacy text carries a personalisation token (for example {{ first_name }}); V3 renders it as literal text',
+      });
+    }
+  };
 
   switch (section.type) {
     case 'headline': {
-      const out: Record<string, unknown> = { level: headlineLevel(settings['size']) };
+      const doc = parseDoc(section.title);
+      warnPersonalisation(doc);
+      const isSubheadline = /^subheadline/i.test(section.label ?? '');
+      const out: Record<string, unknown> = { level: isSubheadline ? 3 : headlineLevel(settings['size']) };
       if (typeof settings['align'] === 'string') out['align'] = settings['align'];
-      return { id, kind: 'headline', value: content, settings: out };
+      return { id, kind: 'headline', value: doc ? docToText(doc) : content, settings: out };
     }
 
     case 'text': {
+      const doc = parseDoc(settings['value']);
+      warnPersonalisation(doc);
       const out: Record<string, unknown> = {};
       if (typeof settings['align'] === 'string') out['align'] = settings['align'];
-      return { id, kind: 'text', value: content, settings: out };
+      return { id, kind: 'text', value: doc ? docToHtml(doc) : content, settings: out };
     }
 
     case 'image': {
@@ -125,16 +147,32 @@ export function mapElement(
 
     case 'button': {
       const link = settings['link'] as Record<string, unknown> | undefined;
-      const url = typeof link?.['url'] === 'string' ? link['url'] : '';
+      const label = typeof link?.['label'] === 'string' && link['label'].trim() ? link['label'].trim() : content || 'Open';
+      const urlDoc = parseDoc(link?.['url']);
+      const url = urlDoc ? docToText(urlDoc) : typeof link?.['url'] === 'string' ? link['url'].trim() : '';
+      const linkType = typeof settings['type'] === 'string' ? settings['type'] : 'custom';
+      let action: { type: string; value: string };
+      if (linkType === 'page' && section.model_id !== null) {
+        const slug = ctx.pageSlugById?.(section.model_id) ?? null;
+        if (slug) action = { type: 'page', value: `/${slug}` };
+        else {
+          action = { type: 'url', value: '' };
+          ctx.warn({ pageSlug: ctx.pageSlug, legacySectionId: section.id, type: 'approximated', reason: `button "${label}" points at legacy page ${section.model_id}, which is not in the plan; it has no target` });
+        }
+      } else if (linkType === 'playlist' && section.model_id !== null) {
+        action = { type: 'page', value: playlistRef(section.model_id) };
+      } else if (linkType === 'file' && section.model_id !== null) {
+        const mediaId = ctx.mediaIdForSection(section);
+        action = { type: 'url', value: mediaId === null ? '' : assetRef(mediaId, 'original') };
+        if (mediaId === null) ctx.warn({ pageSlug: ctx.pageSlug, legacySectionId: section.id, type: 'approximated', reason: `button "${label}" points at legacy file ${section.model_id}, which has no media in the bundle` });
+      } else {
+        action = actionFor(url, ctx.hubOrigins ?? HUB_ORIGINS, ctx.resolvePageSlug);
+      }
       return {
         id,
         kind: 'button',
-        value: content || 'Open',
-        settings: {
-          action: actionFor(url, ctx.hubOrigins ?? HUB_ORIGINS, ctx.resolvePageSlug),
-          variant: 'primary',
-          newTab: link?.['newTab'] === true,
-        },
+        value: label,
+        settings: { action, variant: 'primary', newTab: link?.['newTab'] === true },
       };
     }
 

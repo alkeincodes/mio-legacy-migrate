@@ -145,6 +145,7 @@ export function mapPages(bundle: Bundle): {
           ],
           assetForUrl: (url) => assetByUrl.get(url) ?? null,
           resolvePageSlug,
+          pageSlugById: (legacyPageId) => slugByPage.get(legacyPageId) ?? null,
           mediaIdForSection: (s) =>
             s.model_type === MORPH_FILE && s.model_id !== null
               ? mediaByFileId.get(s.model_id) ?? null

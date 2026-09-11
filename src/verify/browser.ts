@@ -101,8 +101,13 @@ async function login(page: Page, url: string, email: string, password: string): 
   await page.locator('input[type="email"], input[name="email"]').first().fill(email);
   await passwordField.fill(password);
   await page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")').first().click();
-  await page.waitForLoadState('networkidle', { timeout: 60_000 });
-  await page.waitForTimeout(1_500);
+  // The hub sets its session then navigates client-side; wait for the URL to leave /login.
+  try {
+    await page.waitForURL((u) => !/\/login(\?|$)/.test(u.toString()), { timeout: 30_000 });
+  } catch {
+    // fall through to the check below, which names the identity
+  }
+  await page.waitForLoadState('networkidle', { timeout: 60_000 }).catch(() => undefined);
   if (/\/login(\?|$)/.test(page.url()) || (await passwordField.count()) > 0) {
     throw new Error(`login as ${email} at ${url} did not leave the login page (still at ${page.url()}); is that identity a member of this hub?`);
   }

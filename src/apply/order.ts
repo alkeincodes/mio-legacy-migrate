@@ -52,6 +52,20 @@ export function resolveRefs(tree: CatalogNode, resolver: RefResolver): CatalogNo
       }
     }
 
+    const action = node.settings?.['action'] as { type?: string; value?: string } | undefined;
+    if (action && typeof action.value === 'string') {
+      const playlist = PLAYLIST_REF.exec(action.value);
+      const asset = ASSET_REF.exec(action.value);
+      if (playlist) {
+        const id = resolver.playlist(Number(playlist[1]));
+        // A playlist opens from the hub's content page; the id is passed as the route's query.
+        next.settings = { ...node.settings, action: { ...action, type: 'page', value: id === null ? '/content' : `/content?playlist=${id}` } };
+      } else if (asset) {
+        const resolved = resolver.asset(Number(asset[1]), asset[2] ?? 'original');
+        next.settings = { ...node.settings, action: { ...action, type: 'url', value: 'url' in resolved ? resolved.url : '' } };
+      }
+    }
+
     if (node.children) next.children = node.children.map(walk);
     return next;
   };

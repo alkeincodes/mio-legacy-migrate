@@ -94,3 +94,11 @@ describe('resolveRefs', () => {
     expect(JSON.stringify(tree)).toBe(before);
   });
 });
+
+describe('resolveRefs on button actions', () => {
+  it('rewrites a playlist reference in a button action to the content page with the V3 id', () => {
+    const tree: CatalogNode = { id: 'r', kind: 'stack', children: [{ id: 'b', kind: 'button', value: 'Watch', settings: { action: { type: 'page', value: 'ledger://playlist/42' } } }] };
+    const out = resolveRefs(tree, { asset: () => ({ pending: true }), playlist: () => 'pl_1' });
+    expect(out.children?.[0]?.settings?.['action']).toEqual({ type: 'page', value: '/content?playlist=pl_1' });
+  });
+});

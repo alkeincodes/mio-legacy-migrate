@@ -158,3 +158,38 @@ describe('links to renamed pages', () => {
     expect(node?.settings?.['action']).toEqual({ type: 'page', value: '/onboarding-page' });
   });
 });
+
+describe('real legacy content shapes', () => {
+  const doc = (text: string) => JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
+
+  it('headline: reads the TipTap document in title, and a Subheadline label means level 3', () => {
+    const section = { ...fixture('headline'), label: 'Subheadline', title: doc('Build better men') };
+    const node = mapElement(section, 0, ctx());
+    expect(node?.value).toBe('Build better men');
+    expect(node?.settings?.['level']).toBe(3);
+  });
+
+  it('text: reads the TipTap document in settings.value as HTML', () => {
+    const section = { ...fixture('text'), label: 'Paragraph', settings: JSON.stringify({ value: doc('Weekly calls.') }) };
+    expect(mapElement(section, 2, ctx())?.value).toBe('<p>Weekly calls.</p>');
+  });
+
+  it('button: label from settings.link.label and a page target from the row model_id', () => {
+    const section = { ...fixture('button'), label: 'Button', model_type: 'App\\Page', model_id: 284465, settings: JSON.stringify({ type: 'page', link: { label: 'View Here' } }) };
+    const node = mapElement(section, 6, { ...ctx(), pageSlugById: (id) => (id === 284465 ? 'training' : null) });
+    expect(node?.value).toBe('View Here');
+    expect(node?.settings?.['action']).toEqual({ type: 'page', value: '/training' });
+  });
+
+  it('button: a playlist target becomes a resolvable playlist reference', () => {
+    const section = { ...fixture('button'), model_type: 'App\\Playlist', model_id: 42, settings: JSON.stringify({ type: 'playlist', link: { label: 'Watch' } }) };
+    expect(mapElement(section, 6, ctx())?.settings?.['action']).toEqual({ type: 'page', value: 'ledger://playlist/42' });
+  });
+
+  it('button: a custom link keeps the URL out of the TipTap document', () => {
+    const section = { ...fixture('button'), model_type: null, model_id: null, settings: JSON.stringify({ type: 'custom', link: { label: 'Download', url: doc('https://cdn.example.com/w.pdf'), newTab: true } }) };
+    const node = mapElement(section, 6, ctx());
+    expect(node?.settings?.['action']).toEqual({ type: 'url', value: 'https://cdn.example.com/w.pdf' });
+    expect(node?.settings?.['newTab']).toBe(true);
+  });
+});
