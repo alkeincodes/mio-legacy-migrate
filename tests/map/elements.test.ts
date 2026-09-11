@@ -1,0 +1,131 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { mapElement, type ElementContext } from '../../src/map/elements.js';
+import { assetRef } from '../../src/map/sections.js';
+import { nodeId } from '../../src/map/nodeId.js';
+import type { LegacySection } from '../../src/extract/queries.js';
+import type { PlanWarning } from '../../src/map/plan.js';
+
+function fixture(name: string): LegacySection {
+  return JSON.parse(
+    readFileSync(new URL(`../fixtures/elements/${name}.json`, import.meta.url), 'utf8'),
+  ) as LegacySection;
+}
+
+function ctx(warnings: PlanWarning[] = []): ElementContext {
+  return {
+    legacyHubId: 7,
+    legacyPageId: 100,
+    pageSlug: 'home',
+    warn: (w) => warnings.push(w),
+    mediaIdForSection: (section) => (section.model_id === 5 ? 91234 : section.model_id === 6 ? 91235 : null),
+  };
+}
+
+describe('mapElement', () => {
+  it('headline: emits a headline with the content in the top-level value', () => {
+    const node = mapElement(fixture('headline'), 0, ctx());
+    expect(node).toEqual({
+      id: nodeId(7, 100, 21000, 0),
+      kind: 'headline',
+      value: 'Build better men',
+      settings: { level: 2, align: 'center' },
+    });
+  });
+
+  it('subheadline: a medium headline becomes level 3, because legacy collapses subHeadline into headline', () => {
+    expect(mapElement(fixture('subheadline'), 1, ctx())?.settings?.['level']).toBe(3);
+  });
+
+  it('text: keeps the legacy HTML in the top-level value', () => {
+    const node = mapElement(fixture('text'), 2, ctx());
+    expect(node?.kind).toBe('text');
+    expect(node?.value).toBe('<p>Weekly calls, a private forum and a library of talks.</p>');
+    expect(node?.settings?.['align']).toBe('left');
+  });
+
+  it('image: puts a resolvable asset reference in the top-level value, not in settings', () => {
+    const node = mapElement(fixture('image'), 3, ctx());
+    expect(node?.kind).toBe('image');
+    expect(node?.value).toBe(assetRef(91234, 'original'));
+    expect(node?.settings?.['alt']).toBe('Group photo');
+    expect(node?.settings).not.toHaveProperty('value');
+  });
+
+  it('video: emits a native video node whose value is the playback asset reference', () => {
+    const node = mapElement(fixture('video'), 4, ctx());
+    expect(node?.kind).toBe('video');
+    expect(node?.value).toBe(assetRef(91235, 'original'));
+    expect(node?.settings?.['embed_type']).toBe('native');
+  });
+
+  it('icon: puts the glyph name in the value, because icon reads value not settings.name', () => {
+    const node = mapElement(fixture('icon'), 5, ctx());
+    expect(node?.kind).toBe('icon');
+    expect(node?.value).toBe('shield');
+    expect(node?.settings?.['size']).toBe(24);
+  });
+
+  it('button: builds a url action object, not the deprecated href string', () => {
+    const node = mapElement(fixture('button'), 6, ctx());
+    expect(node?.kind).toBe('button');
+    expect(node?.value).toBe('Join now');
+    expect(node?.settings?.['action']).toEqual({
+      type: 'url',
+      value: 'https://mantalks.com/join',
+    });
+    expect(node?.settings).not.toHaveProperty('href');
+  });
+
+  it('button: rewrites a link to another page on this hub as a page action', () => {
+    const section = fixture('button');
+    section.settings = JSON.stringify({ link: { url: 'https://alliance.mantalks.com/courses' } });
+    const node = mapElement(section, 6, { ...ctx(), pageSlug: 'home' });
+    expect(node?.settings?.['action']).toEqual({ type: 'page', value: '/courses' });
+  });
+
+  it('line-break: emits a divider', () => {
+    expect(mapElement(fixture('line-break'), 7, ctx())?.kind).toBe('divider');
+  });
+
+  it('input: has no catalog equivalent, so it becomes labelled text with an approximated warning', () => {
+    const warnings: PlanWarning[] = [];
+    const node = mapElement(fixture('input'), 8, ctx(warnings));
+    expect(node?.kind).toBe('text');
+    expect(node?.value).toBe('Email address');
+    expect(warnings[0]).toMatchObject({ type: 'approximated', legacySectionId: 21008 });
+    expect(warnings[0]?.reason).toContain('input');
+  });
+
+  it('embed-code: an embeddable URL becomes an iframe video node', () => {
+    const warnings: PlanWarning[] = [];
+    const node = mapElement(fixture('embed-code'), 9, ctx(warnings));
+    expect(node?.kind).toBe('video');
+    expect(node?.value).toBe('https://player.vimeo.com/video/12345');
+    expect(node?.settings?.['embed_type']).toBe('iframe');
+    expect(warnings[0]?.type).toBe('approximated');
+  });
+
+  it('embed-code: raw markup with no URL becomes text rather than being dropped', () => {
+    const section = fixture('embed-code');
+    section.settings = JSON.stringify({ embed: { src: '<script>alert(1)</script>' } });
+    const warnings: PlanWarning[] = [];
+    const node = mapElement(section, 9, ctx(warnings));
+    expect(node?.kind).toBe('text');
+    expect(warnings[0]?.type).toBe('approximated');
+  });
+
+  it('returns null for a hidden element so it does not reach the tree', () => {
+    const section = fixture('text');
+    section.hidden = 1;
+    expect(mapElement(section, 2, ctx())).toBeNull();
+  });
+
+  it('never emits a node kind outside the catalog vocabulary', () => {
+    const allowed = new Set(['headline', 'text', 'image', 'video', 'icon', 'button', 'divider']);
+    for (const name of ['headline', 'subheadline', 'text', 'image', 'video', 'icon', 'button', 'line-break', 'input', 'embed-code']) {
+      const node = mapElement(fixture(name), 0, ctx());
+      if (node) expect(allowed.has(node.kind)).toBe(true);
+    }
+  });
+});
