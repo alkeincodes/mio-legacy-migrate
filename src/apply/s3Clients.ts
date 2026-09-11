@@ -1,5 +1,5 @@
 import {
-  CopyObjectCommand, DeleteObjectCommand, HeadBucketCommand, HeadObjectCommand, S3Client,
+  CopyObjectCommand, DeleteObjectCommand, GetBucketVersioningCommand, HeadBucketCommand, HeadObjectCommand, S3Client,
 } from '@aws-sdk/client-s3';
 import type { Env } from '../config/env.js';
 import { logger } from '../log/logger.js';
@@ -39,17 +39,19 @@ export function principalsFromEnv(env: Env, region: string): S3Principals {
 
 /**
  * Every call whose Bucket is the V3 bucket runs under the V3 principal:
- * HeadBucket, HeadObject and DeleteObject on it, and CopyObject, whose Bucket is
- * the destination. So the V3 principal also needs s3:GetObject on the legacy
- * bucket. Everything on the legacy bucket runs under the legacy principal.
+ * HeadBucket, GetBucketVersioning, HeadObject and DeleteObject on it, and
+ * CopyObject, whose Bucket is the destination. So the V3 principal also needs
+ * s3:GetObject (and s3:GetObjectVersion when the legacy bucket is versioned) on
+ * the legacy bucket. Everything on the legacy bucket runs under the legacy
+ * principal. The exact action list per call is in docs/contracts.md.
  */
 export function s3OpsFor(principals: S3Principals, v3Bucket: string): S3Ops {
   const clientFor = (bucket: string): S3Sender => (bucket === v3Bucket ? principals.v3 : principals.legacy);
   return {
-    async head(bucket, key): Promise<HeadResult | null> {
+    async head(bucket, key, versionId): Promise<HeadResult | null> {
       try {
         const out = (await clientFor(bucket).send(
-          new HeadObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: 'ENABLED' }),
+          new HeadObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: 'ENABLED', ...(versionId ? { VersionId: versionId } : {}) }),
         )) as { ContentLength?: number; ETag?: string; VersionId?: string; ChecksumCRC64NVME?: string; ContentType?: string };
         return {
           sizeBytes: out.ContentLength ?? 0,
@@ -64,7 +66,11 @@ export function s3OpsFor(principals: S3Principals, v3Bucket: string): S3Ops {
     },
     async copy(source: CopySource, destination: CopyDestination) {
       const copySource = `${source.bucket}/${encodeURIComponent(source.key)}${source.versionId ? `?versionId=${source.versionId}` : ''}`;
-      await clientFor(destination.bucket).send(new CopyObjectCommand({
+      // CopyObject takes only the algorithm (no ChecksumType input exists on the
+      // request, SDK 3.1130 CopyObjectRequest); CRC64NVME is a full-object
+      // algorithm, and the response says which type S3 recorded, so a composite
+      // answer is refused here rather than at verify.
+      const out = (await clientFor(destination.bucket).send(new CopyObjectCommand({
         Bucket: destination.bucket,
         Key: destination.key,
         CopySource: copySource,
@@ -72,7 +78,13 @@ export function s3OpsFor(principals: S3Principals, v3Bucket: string): S3Ops {
         ChecksumAlgorithm: 'CRC64NVME',
         ContentType: destination.contentType ?? undefined,
         MetadataDirective: 'REPLACE',
-      }));
+        // REPLACE with no Tagging: the copy inherits no source tags and needs no s3:PutObjectTagging on the destination.
+        TaggingDirective: 'REPLACE',
+      }))) as { CopyObjectResult?: { ChecksumType?: string } };
+      const checksumType = out.CopyObjectResult?.ChecksumType;
+      if (checksumType && checksumType !== 'FULL_OBJECT') {
+        throw new Error(`copy of ${copySource} to ${destination.bucket}/${destination.key} recorded a ${checksumType} checksum, not FULL_OBJECT; the verify step cannot compare it with the source`);
+      }
     },
     async multipartCopy(source, destination) {
       throw new Error(
@@ -89,6 +101,14 @@ export function s3OpsFor(principals: S3Principals, v3Bucket: string): S3Ops {
         return true;
       } catch {
         return false;
+      }
+    },
+    async bucketVersioning(bucket) {
+      try {
+        const out = (await clientFor(bucket).send(new GetBucketVersioningCommand({ Bucket: bucket }))) as { Status?: string };
+        return out.Status === 'Enabled' || out.Status === 'Suspended' ? out.Status : null;
+      } catch {
+        return null;
       }
     },
   };

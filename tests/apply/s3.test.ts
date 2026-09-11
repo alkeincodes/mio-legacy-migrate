@@ -4,9 +4,12 @@ import { copyObject, destinationKeyFor, MULTIPART_THRESHOLD_BYTES, verifyCopy, t
 const source = { bucket: 'legacy', key: '91234/intro.mp4', versionId: 'v1', etag: '"abc"', sizeBytes: 1_000 };
 const destination = { bucket: 'v3', key: 'team-1/media/med_1/original', contentType: 'video/mp4' };
 
+/** The source answers as the manifest pinned it; the destination is empty. */
+const sourceHead = { sizeBytes: 1_000, etag: '"abc"', versionId: 'v1', checksumCrc64Nvme: null, contentType: 'video/mp4' };
+
 function ops(overrides: Partial<S3Ops> = {}): S3Ops {
   return {
-    head: vi.fn(async () => null),
+    head: vi.fn(async (bucket: string) => (bucket === 'legacy' ? sourceHead : null)),
     copy: vi.fn(async () => {}),
     multipartCopy: vi.fn(async () => {}),
     abortIncompleteUploads: vi.fn(async () => 0),
@@ -22,23 +25,44 @@ describe('destinationKeyFor', () => {
 });
 
 describe('copyObject', () => {
-  it('copies when the destination is empty', async () => {
+  it('copies when the destination is empty, after reading the source at its pinned version', async () => {
     const o = ops();
     expect(await copyObject(o, source, destination)).toBe('copied');
     expect(o.copy).toHaveBeenCalledWith(source, destination);
+    expect(o.head).toHaveBeenCalledWith('legacy', '91234/intro.mp4', 'v1');
   });
 
+  it('stops before copying when the source is gone or no longer the pinned size', async () => {
+    const gone = ops({ head: vi.fn(async () => null) });
+    await expect(copyObject(gone, source, destination)).rejects.toThrow(/legacy\/91234\/intro.mp4\?versionId=v1 is gone/);
+    expect(gone.copy).not.toHaveBeenCalled();
+    const grown = ops({ head: vi.fn(async (bucket: string) => (bucket === 'legacy' ? { ...sourceHead, sizeBytes: 1_001 } : null)) });
+    await expect(copyObject(grown, source, destination)).rejects.toThrow(/1001 bytes but the manifest pinned 1000/);
+    expect(grown.copy).not.toHaveBeenCalled();
+  });
+
+  it('on an unversioned bucket, stops when the source ETag moved since pinning', async () => {
+    const moved = ops({ head: vi.fn(async (bucket: string) => (bucket === 'legacy' ? { ...sourceHead, versionId: null, etag: '"zzz"' } : null)) });
+    await expect(copyObject(moved, { ...source, versionId: null }, destination)).rejects.toThrow(/ETag "zzz" but the manifest pinned "abc"/);
+    expect(moved.copy).not.toHaveBeenCalled();
+    expect(moved.head).toHaveBeenCalledWith('legacy', '91234/intro.mp4', null);
+  });
+
+  const huge = { ...source, sizeBytes: MULTIPART_THRESHOLD_BYTES + 1 };
+  const hugeOps = (overrides: Partial<S3Ops> = {}) =>
+    ops({ head: vi.fn(async (bucket: string) => (bucket === 'legacy' ? { ...sourceHead, sizeBytes: huge.sizeBytes } : null)), ...overrides });
+
   it('uses a multipart copy above the 5 GB threshold', async () => {
-    const o = ops();
-    await copyObject(o, { ...source, sizeBytes: MULTIPART_THRESHOLD_BYTES + 1 }, destination);
+    const o = hugeOps();
+    await copyObject(o, huge, destination);
     expect(o.multipartCopy).toHaveBeenCalled();
     expect(o.copy).not.toHaveBeenCalled();
   });
 
   it('aborts incomplete multipart uploads for the destination key before retrying', async () => {
     const abort = vi.fn(async () => 2);
-    const o = ops({ abortIncompleteUploads: abort });
-    await copyObject(o, { ...source, sizeBytes: MULTIPART_THRESHOLD_BYTES + 1 }, destination);
+    const o = hugeOps({ abortIncompleteUploads: abort });
+    await copyObject(o, huge, destination);
     expect(abort).toHaveBeenCalledWith('v3', 'team-1/media/med_1/original');
   });
 

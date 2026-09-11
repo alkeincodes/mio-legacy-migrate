@@ -1,5 +1,5 @@
 import { logger } from '../log/logger.js';
-import { destinationKeyFor, type S3Ops } from './s3.js';
+import { assertSourceMatches, destinationKeyFor, type S3Ops } from './s3.js';
 import type { ApiClient } from './api.js';
 import type { PlanAsset } from '../map/plan.js';
 
@@ -16,7 +16,8 @@ export async function checkAccess(opts: {
   bucket: string;
   cdnBase?: string;
   cdnBaseConfirmed?: boolean;
-}): Promise<void> {
+}): Promise<{ notes: string[] }> {
+  const notes: string[] = [];
   if (opts.cdnBase !== undefined) {
     logger.info(
       opts.cdnBaseConfirmed === false
@@ -46,7 +47,15 @@ export async function checkAccess(opts: {
     }
   }
 
+  if (opts.s3.bucketVersioning && (await opts.s3.bucketVersioning(opts.bucket)) === 'Enabled') {
+    const note = `check-access: destination bucket "${opts.bucket}" has versioning enabled, so the probe delete leaves a delete marker plus a noncurrent version at ${probeKey}; a lifecycle rule on ${opts.teamId}/media/probe-* can expire them`;
+    notes.push(note);
+    logger.info(note);
+  }
+
   try {
+    // The same source read the copy does, at the pinned version, under the legacy principal.
+    await assertSourceMatches(opts.s3, source);
     await opts.s3.copy(source, destination);
     const head = await opts.s3.head(opts.bucket, probeKey);
     if (!head) throw new Error(`the probe copy wrote nothing to ${opts.bucket}/${probeKey}`);
@@ -74,4 +83,5 @@ export async function checkAccess(opts: {
     }
   }
   logger.info('check-access: both authorization test members exist');
+  return { notes };
 }

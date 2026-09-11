@@ -114,3 +114,24 @@ header the route accepts, if any.
   trees are rewritten (If-Match on draft_version) and republished, which is how
   a content mapping fix reaches a hub that is already applied. Every other kind
   must still hash identically.
+
+## S3 calls and the IAM actions each one needs
+
+Two principals: the legacy pair (`AWS_ACCESS_KEY_ID`, read-only on the legacy
+bucket) and the V3 pair (`V3_AWS_*`, on the V3 bucket). A call runs under the
+principal of the bucket it names; CopyObject names the destination, so it runs
+under the V3 pair, which therefore also needs read on the legacy bucket. Every
+call, in the order a copy makes them:
+
+| call | bucket | principal | actions | when |
+| --- | --- | --- | --- | --- |
+| HeadBucket | legacy and V3 | each its own | `s3:ListBucket` | `--check-access` only |
+| GetBucketVersioning | V3 | V3 | `s3:GetBucketVersioning` | `--check-access` only; a refusal is read as "unknown", not an error |
+| HeadObject with `VersionId` when the manifest pinned one, `ChecksumMode: ENABLED` | legacy | legacy | `s3:GetObject`, plus `s3:GetObjectVersion` on a versioned bucket, plus `s3:GetObjectAttributes` for the checksum | pinning (`extract`, `extract --s3-only`), and again before every copy so the copied version is the pinned one |
+| CopyObject with `CopySource ?versionId=` (or `CopySourceIfMatch` ETag when unversioned), `ChecksumAlgorithm: CRC64NVME` (the request has no `ChecksumType` input, SDK 3.1130 `CopyObjectRequest`; CRC64NVME is full-object by definition and the response's `CopyObjectResult.ChecksumType` is checked, a composite answer stops the run), `MetadataDirective: REPLACE`, `TaggingDirective: REPLACE` with no tags | V3 (destination) | V3 | `s3:PutObject` on the destination key; `s3:GetObject` (and `s3:GetObjectVersion`) on the legacy source; `kms:Decrypt` on the legacy key and `kms:GenerateDataKey` on the V3 key when either bucket is KMS-encrypted. No `s3:PutObjectTagging`: the copy carries no tags | every copy, and the probe copy |
+| HeadObject `ChecksumMode: ENABLED` | V3 | V3 | `s3:GetObject`, `s3:GetObjectAttributes` | after every copy (adopt check before, verify after) |
+| DeleteObject | V3, the probe key `{team_id}/media/probe-<timestamp>/original` only | V3 | `s3:DeleteObject` on that key prefix only | `--check-access` cleanup. On a versioned bucket this leaves a delete marker plus a noncurrent version; check-access prints a note so infra can add a lifecycle rule for `{team_id}/media/probe-*` |
+
+Apply never lists either bucket, never deletes a migrated object, and never
+writes tags or ACLs. Multipart copies above 5 GB are not wired up and are
+reported for a manual `aws s3 cp`.

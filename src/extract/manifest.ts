@@ -44,7 +44,8 @@ export interface HeadResult {
   contentType: string | null;
 }
 
-export type HeadObjectFn = (bucket: string, key: string) => Promise<HeadResult | null>;
+/** HeadObject on the source; `versionId` pins the call to an already-pinned version so a re-pin reads the same object. */
+export type HeadObjectFn = (bucket: string, key: string, versionId?: string | null) => Promise<HeadResult | null>;
 
 export interface ManifestInput {
   files: LegacyFile[];
@@ -155,7 +156,7 @@ export async function pinManifest(
 ): Promise<Array<{ legacyMediaId: number; variant: string; key: string }>> {
   const missing: Array<{ legacyMediaId: number; variant: string; key: string }> = [];
   for (const entry of entries) {
-    const result = await head(bucket, entry.sourceKey);
+    const result = await head(bucket, entry.sourceKey, entry.versionId);
     if (!result) {
       missing.push({ legacyMediaId: entry.legacyMediaId, variant: entry.variant, key: entry.sourceKey });
       continue;

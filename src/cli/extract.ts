@@ -29,9 +29,9 @@ function s3Head(env: Env): HeadObjectFn {
     region: env.awsRegion,
     credentials: { accessKeyId: env.awsAccessKeyId, secretAccessKey: env.awsSecretAccessKey },
   });
-  return async (bucket, key) => {
+  return async (bucket, key, versionId) => {
     try {
-      const out = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: 'ENABLED' }));
+      const out = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: 'ENABLED', ...(versionId ? { VersionId: versionId } : {}) }));
       return {
         sizeBytes: out.ContentLength ?? 0,
         etag: out.ETag ?? '',

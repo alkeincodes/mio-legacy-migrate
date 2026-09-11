@@ -17,13 +17,35 @@ export interface CopyDestination {
 }
 
 export interface S3Ops {
-  head(bucket: string, key: string): Promise<HeadResult | null>;
+  /** HeadObject; `versionId` reads that exact version, so a pinned source is checked as the object the copy will read. */
+  head(bucket: string, key: string, versionId?: string | null): Promise<HeadResult | null>;
   copy(source: CopySource, destination: CopyDestination): Promise<void>;
   multipartCopy(source: CopySource, destination: CopyDestination): Promise<void>;
   abortIncompleteUploads(bucket: string, key: string): Promise<number>;
   delete(bucket: string, key: string): Promise<void>;
   /** HeadBucket; lets check-access say which side is missing before a copy fails with a bare NoSuchBucket. */
   bucketExists?(bucket: string): Promise<boolean>;
+  /** GetBucketVersioning; null when the call is refused or the bucket was never versioned. */
+  bucketVersioning?(bucket: string): Promise<'Enabled' | 'Suspended' | null>;
+}
+
+/**
+ * The source, read at the pinned version, must still be the object the manifest
+ * describes: present, the same size, and for an unversioned bucket the same
+ * ETag. Otherwise the copy would land bytes the ledger's generation marker does
+ * not identify.
+ */
+export async function assertSourceMatches(ops: S3Ops, source: CopySource): Promise<HeadResult> {
+  const head = await ops.head(source.bucket, source.key, source.versionId);
+  const at = `${source.bucket}/${source.key}${source.versionId ? `?versionId=${source.versionId}` : ''}`;
+  if (!head) throw new Error(`source ${at} is gone or unreadable at the pinned version; re-run extract --s3-only`);
+  if (head.sizeBytes !== source.sizeBytes) {
+    throw new Error(`source ${at} is ${head.sizeBytes} bytes but the manifest pinned ${source.sizeBytes}; re-run extract --s3-only`);
+  }
+  if (!source.versionId && source.etag && head.etag !== source.etag) {
+    throw new Error(`source ${at} has ETag ${head.etag} but the manifest pinned ${source.etag}; re-run extract --s3-only`);
+  }
+  return head;
 }
 
 /** app/media/storage_paths.py: {team_id}/media/{media_id}/{variant}, and register-synthetic uses "original". */
@@ -34,7 +56,8 @@ export function destinationKeyFor(teamId: string, mediaId: string): string {
 /**
  * Destination keys are freshly allocated media ids, so the only object that can
  * already be there is our own earlier attempt: a matching size is adopted, any
- * other non-empty destination is an error.
+ * other non-empty destination is an error. Before a real copy the source is
+ * read back at its pinned version, so what lands is what extract pinned.
  */
 export async function copyObject(
   ops: S3Ops,
@@ -48,6 +71,8 @@ export async function copyObject(
       `destination ${destination.bucket}/${destination.key} already holds an object of ${existing.sizeBytes} bytes but the source is ${source.sizeBytes}; refusing to overwrite`,
     );
   }
+
+  await assertSourceMatches(ops, source);
 
   if (source.sizeBytes > MULTIPART_THRESHOLD_BYTES) {
     await ops.abortIncompleteUploads(destination.bucket, destination.key);

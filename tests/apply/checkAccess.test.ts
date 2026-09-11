@@ -50,8 +50,26 @@ describe('checkAccess', () => {
 
   it('copies a probe, verifies it, deletes it and confirms the test members when everything exists', async () => {
     const ops = s3(() => true);
-    await checkAccess({ probe, s3: ops, api, teamId: 'team-1', bucket: 'v3' });
+    const result = await checkAccess({ probe: { ...probe, versionId: 'v-src' }, s3: ops, api, teamId: 'team-1', bucket: 'v3' });
+    // Source read at the pinned version first, then the destination after the copy.
+    expect(ops.head).toHaveBeenNthCalledWith(1, 'legacy', '1/a.png', 'v-src');
     expect(ops.copy).toHaveBeenCalledTimes(1);
     expect(ops.delete).toHaveBeenCalledTimes(1);
+    expect(result.notes).toEqual([]);
+  });
+
+  it('says when the destination bucket is versioned, because the probe delete leaves a marker and a version behind', async () => {
+    const ops = { ...s3(() => true), bucketVersioning: vi.fn(async () => 'Enabled' as const) };
+    const result = await checkAccess({ probe, s3: ops, api, teamId: 'team-1', bucket: 'v3' });
+    expect(result.notes).toHaveLength(1);
+    expect(result.notes[0]).toMatch(/versioning enabled.*delete marker.*noncurrent version.*team-1\/media\/probe-/);
+    expect(ops.bucketVersioning).toHaveBeenCalledWith('v3');
+  });
+
+  it('stops before the probe copy when the source no longer matches the manifest', async () => {
+    const ops = s3(() => true);
+    ops.head = vi.fn(async () => ({ sizeBytes: 99, etag: '"e"', versionId: null, checksumCrc64Nvme: null, contentType: null }));
+    await expect(checkAccess({ probe, s3: ops, api, teamId: 'team-1', bucket: 'v3' })).rejects.toThrow(/99 bytes but the manifest pinned 10/);
+    expect(ops.copy).not.toHaveBeenCalled();
   });
 });

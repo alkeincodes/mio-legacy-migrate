@@ -126,4 +126,17 @@ describe('hub-owned decoration media', () => {
     expect(entries[0]).toMatchObject({ legacyFileId: 0, legacyOwner: { type: 'App\\Hub', id: 7 }, visibility: 'public' });
     expect(entries[1]?.cdnUrl).toBe('https://cdn.legacy.example.com/4189044/conversions/pathway-optimized_thumbnail.png');
   });
+
+  it('re-pins an already pinned entry at its recorded version, so a re-run reads the same object', async () => {
+    const pinnedHead = vi.fn(async (_bucket: string, _key: string, versionId?: string | null): Promise<HeadResult | null> => ({
+      sizeBytes: 5, etag: '"p"', versionId: versionId ?? 'fresh', checksumCrc64Nvme: null, contentType: 'image/png',
+    }));
+    const entry = { legacyFileId: 5, legacyMediaId: 91234, variant: 'original', disk: 's3', sourceBucket: '', sourceKey: '91234/intro.png', sizeBytes: 0, etag: '', versionId: 'v1', checksumCrc64Nvme: null, mimeType: 'image/png', cdnUrl: 'u', folderIds: [], playlistIds: [], visibility: 'public' as const, gates: [], captionUrls: [] };
+    const unpinned = { ...entry, legacyMediaId: 91235, sourceKey: '91235/b.png', versionId: null };
+    expect(await pinManifest([entry, unpinned], 'legacy', pinnedHead)).toEqual([]);
+    expect(pinnedHead).toHaveBeenNthCalledWith(1, 'legacy', '91234/intro.png', 'v1');
+    expect(pinnedHead).toHaveBeenNthCalledWith(2, 'legacy', '91235/b.png', null);
+    expect(entry.versionId).toBe('v1');
+    expect(unpinned.versionId).toBe('fresh');
+  });
 });
