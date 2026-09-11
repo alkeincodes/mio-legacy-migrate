@@ -1,0 +1,9 @@
+node_modules/
+dist/
+bundles/
+plans/
+runs/
+state/
+.playwright/
+.env
+.DS_Store
