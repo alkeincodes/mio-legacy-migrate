@@ -56,7 +56,9 @@ export function sectionSurfaceFor(settings: Record<string, unknown>, hidden: boo
   const styles = settings['styles'] as Record<string, unknown> | undefined;
   const surface: Surface = { padding: surfacePaddingFor(styles) };
   const background = surfaceBackgroundFor(settings['background'] as Record<string, unknown> | undefined, theme);
-  if (background) surface['background'] = background;
+  // A legacy section with no background shows the page colour; without an explicit
+  // `none` the hero template paints its own default tint instead.
+  surface['background'] = background ?? { type: 'none' };
   const visibility = styles?.['visibility'];
   if (hidden) surface['visibility'] = { desktop: false, mobile: false };
   else if (visibility === 'desktop') surface['visibility'] = { desktop: true, mobile: false };

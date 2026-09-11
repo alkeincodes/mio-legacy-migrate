@@ -15,7 +15,7 @@ describe('style translation', () => {
     expect(sectionSurfaceFor({ background: { type: 'custom-color', color: '#242424' } }, false)['background']).toEqual({ type: 'custom-color', value: '#242424' });
     expect(sectionSurfaceFor({ background: { type: 'secondary-color' } }, false)['background']).toEqual({ type: 'color', token: 'secondary' });
     expect(sectionSurfaceFor({ background: { type: 'image', image: { url: 'https://x/y.png' }, color: '#878C6A' } }, false)['background']).toEqual({ type: 'image', url: 'https://x/y.png', blur: false });
-    expect(sectionSurfaceFor({ background: { type: 'default' } }, false)).not.toHaveProperty('background');
+    expect(sectionSurfaceFor({ background: { type: 'default' } }, false)['background']).toEqual({ type: 'none' });
   });
 
   it('carries desktop-only or mobile-only visibility', () => {
