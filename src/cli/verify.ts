@@ -103,10 +103,13 @@ export async function runVerify(opts: {
 
   const tokens: Record<Principal, string | null> = {
     anonymous: null,
-    memberNoEntitlement: process.env['V3_TEST_MEMBER_NOENT_TOKEN'] ?? null,
-    memberEntitled: process.env['V3_TEST_MEMBER_ENTITLED_TOKEN'] ?? null,
+    memberNoEntitlement: process.env['V3_TEST_MEMBER_NOENT_TOKEN'] || null,
+    memberEntitled: process.env['V3_TEST_MEMBER_ENTITLED_TOKEN'] || null,
   };
-  const authz = await runAuthorizationChecks(targets, async (url, principal) => {
+  // Without both test-member tokens the matrix cannot distinguish the principals; say so rather than pretend.
+  const authzSkipped = !tokens.memberNoEntitlement || !tokens.memberEntitled;
+  if (authzSkipped) logger.warn('authorization checks skipped: V3_TEST_MEMBER_NOENT_TOKEN / V3_TEST_MEMBER_ENTITLED_TOKEN are not set (the test members do not exist yet)');
+  const authz = authzSkipped ? [] : await runAuthorizationChecks(targets, async (url, principal) => {
     const token = tokens[principal];
     const response = await fetch(url, {
       redirect: 'manual',
@@ -121,7 +124,7 @@ export async function runVerify(opts: {
 
 ## Verdict
 
-${verdict.accepted ? 'Accepted, pending a named signature above.' : 'Not accepted.'}
+${verdict.accepted ? 'Accepted, pending a named signature above.' : 'Not accepted.'}${authzSkipped ? ' Authorization checks were SKIPPED: the two test members do not exist yet, so spec 7.5 is unverified.' : ''}
 
 ${verdict.failures.map((f) => `- FAIL ${f}`).join('\n') || '- no blocking failures'}
 `;

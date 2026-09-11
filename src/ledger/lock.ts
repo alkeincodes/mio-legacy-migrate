@@ -112,6 +112,14 @@ export function assertLedgerClean(dir: string, git: GitRunner = realGit): void {
     );
   }
 
+  // A clone with no upstream (a local-only repo) has no remote to compare
+  // against; the uncommitted-changes check above still applies.
+  const upstream = git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
+  if (upstream.status !== 0) {
+    process.stderr.write('WARN the ledger repo has no upstream; skipping the behind-remote check (single-operator repo)\n');
+    return;
+  }
+
   const fetch = git(['fetch', '--quiet']);
   if (fetch.status !== 0) {
     throw new LedgerDirtyError(`git fetch failed: ${fetch.stdout.trim()}`);

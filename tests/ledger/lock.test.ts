@@ -97,6 +97,14 @@ describe('assertLedgerClean', () => {
     expect(() => assertLedgerClean('ledger/mantalks-prod/7', git)).toThrow(/uncommitted/);
   });
 
+  it('passes a clean clone with no upstream, warning instead of failing the fetch', () => {
+    const git = vi.fn((args: string[]) =>
+      args[0] === 'rev-parse' ? { status: 128, stdout: 'fatal: no upstream configured' } : { status: 0, stdout: '' },
+    );
+    expect(() => assertLedgerClean('ledger/mantalks-prod/7', git)).not.toThrow();
+    expect(git).not.toHaveBeenCalledWith(['fetch', '--quiet']);
+  });
+
   it('refuses when the branch is behind the remote, so another operator run is invisible', () => {
     const git = vi.fn((args: string[]) => {
       if (args[0] === 'rev-list') return { status: 0, stdout: '0 3' };
