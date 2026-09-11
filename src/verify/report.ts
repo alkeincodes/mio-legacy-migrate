@@ -182,3 +182,16 @@ export function publishedRootOf(body: unknown): CatalogNode | null {
   const root = (tree as { root?: unknown }).root ?? tree;
   return root && typeof root === 'object' && 'kind' in (root as object) ? (root as CatalogNode) : null;
 }
+
+/**
+ * Screenshots are opt-in (`verify --shots`): until the assets have landed the
+ * sheet would only record placeholders, so the default is to skip the capture
+ * and say why. The browser playback check needs no shots and always runs.
+ */
+export function contactSheetDecision(opts: { shots: boolean; pendingAssets: number }): { capture: boolean; reason: string } {
+  if (opts.shots) return { capture: true, reason: 'requested with --shots' };
+  return {
+    capture: false,
+    reason: `contact sheet skipped: screenshots are opt-in (--shots) and assets are still pending (assets pending: ${opts.pendingAssets})`,
+  };
+}

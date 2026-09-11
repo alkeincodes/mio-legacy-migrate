@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildStructuralReport, publishedRootOf, renderReportMarkdown } from '../../src/verify/report.js';
+import { buildStructuralReport, contactSheetDecision, publishedRootOf, renderReportMarkdown } from '../../src/verify/report.js';
 import { LedgerStore } from '../../src/ledger/store.js';
 import { contentHash, type Plan } from '../../src/map/plan.js';
 import type { LedgerHeader } from '../../src/ledger/schema.js';
@@ -168,5 +168,18 @@ describe('publishedRootOf', () => {
   it('returns null for a page with no published tree or a non-tree body', () => {
     expect(publishedRootOf({ data: { attributes: { slug: 'x' } } })).toBeNull();
     expect(publishedRootOf(null)).toBeNull();
+  });
+});
+
+describe('contactSheetDecision', () => {
+  it('skips the capture by default and names the pending asset count', () => {
+    expect(contactSheetDecision({ shots: false, pendingAssets: 3003 })).toEqual({
+      capture: false,
+      reason: 'contact sheet skipped: screenshots are opt-in (--shots) and assets are still pending (assets pending: 3003)',
+    });
+  });
+
+  it('captures when --shots is given', () => {
+    expect(contactSheetDecision({ shots: true, pendingAssets: 0 }).capture).toBe(true);
   });
 });

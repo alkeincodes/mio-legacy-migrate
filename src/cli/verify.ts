@@ -8,7 +8,7 @@ import { contentHash, readPlan } from '../map/plan.js';
 import { LedgerStore, ledgerDir } from '../ledger/store.js';
 import { Budget, budgetIdentity } from '../apply/budget.js';
 import { ApiClient } from '../apply/api.js';
-import { buildStructuralReport, publishedRootOf, renderReportMarkdown, writeReport, type LiveCounts } from '../verify/report.js';
+import { buildStructuralReport, contactSheetDecision, publishedRootOf, renderReportMarkdown, writeReport, type LiveCounts } from '../verify/report.js';
 import { captureContactSheet, runBrowserPlaybackChecks } from '../verify/browser.js';
 import { runAuthorizationChecks, type AuthzTarget, type Principal } from '../verify/authz.js';
 import { evaluateAcceptance, type AcceptanceVerdict } from '../verify/acceptance.js';
@@ -19,8 +19,8 @@ export async function runVerify(opts: {
   profileName: string;
   planPath: string;
   milestone: 'M1' | 'M2';
-  /** Reuse the run's existing contact sheet instead of capturing 124 shots again. */
-  skipContactSheet?: boolean;
+  /** Capture the contact sheet; off by default until the assets have landed. */
+  shots?: boolean;
 }): Promise<AcceptanceVerdict> {
   const env = loadEnv('.env', { require: ['cdn', 'logins'] });
   logger.setSecrets(secretsOf(env));
@@ -74,13 +74,15 @@ export async function runVerify(opts: {
   if (!plan.legacyHubDomain) throw new Error('the plan carries no legacyHubDomain; re-run map');
   const legacyOrigin = `https://${plan.legacyHubDomain}`;
 
-  if (opts.skipContactSheet && existsSync(`${runDir}/contact-sheet.html`)) {
-    logger.info('reusing the existing contact sheet', { path: `${runDir}/contact-sheet.html` });
-  } else {
+  const pendingAssets = store.all().filter((e) => e.kind === 'asset' && (e.state === 'pending-copy' || e.state === 'pending-import')).length;
+  const sheet = contactSheetDecision({ shots: opts.shots === true, pendingAssets });
+  if (sheet.capture) {
     await captureContactSheet({
       env, slugs: plan.pages.map((p) => p.slug), legacyOrigin, v3Origin,
       hubTitle: plan.hub.title, runDir,
     });
+  } else {
+    logger.info(sheet.reason);
   }
 
   // Only pages whose tree shows a legacy-linked video get the browser check.
