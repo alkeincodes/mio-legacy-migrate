@@ -88,3 +88,27 @@ Still not run: `extract --s3-only`, `apply --check-access`, any real apply,
   `searchie_production` has no `s3:PutObject` on the V3 bucket). Nothing was
   written; the member check did not run. Needs the V3 pair in `.env`.
 - `apply --dry-run` on the pinned plan: unchanged, 2075 operations.
+
+## 2026-09-12, --skip-assets, --assets-only, --hub-slug, --publish-held
+
+- New ledger asset state `pending-copy` with recorded references (page nodes,
+  playlist items). `apply --skip-assets` registers and copies nothing; public
+  page images and videos that pass the prefilter go `legacy-linked`.
+  `apply --assets-only --resume <run>` copies what was left and reruns the
+  playlist and page-tree stages to rewrite references by content hash.
+- Hub slug comes from the plan (custom subdomain, else domain label), with
+  `--hub-slug`; the backend auto-suffixes a globally taken slug with a 200,
+  so the hub stage stops if the assigned slug differs. Team has zero hubs.
+- `--publish-held` publishes segment-gated pages and lists them as
+  published-ungated with the legacy segment names, in the ledger, the run
+  dir and the verify report.
+- Real data: legacy image elements store their picture as
+  `settings.thumbnail.url`, an App\\Hub media row in the `thumbnails` or
+  `background-images` collection. Extract now carries every Hub-owned media
+  outside the branding collections. Manifest grew to 3079 variants (3065
+  pinned, 14 misses: unreferenced `optimized_image*` conversions).
+- Dry run with `--skip-assets --publish-held --hub-slug alliance`: 3339
+  operations, 62 legacy-links (55 images, 7 videos; every page image), 2582
+  pending-copy, 421 pending-import, 26 publish, 5 publish-ungated, URL
+  https://hub.member.dev/alliance. Plan warnings back to 13, 0 dropped.
+- Latest pinned plan: plans/hub-38827-25f604b168ef.json. Still no real apply.
