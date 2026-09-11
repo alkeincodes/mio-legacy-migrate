@@ -116,12 +116,14 @@ describe('unpinnedHeadFor and pinManifest', () => {
   });
 });
 
-describe('section-owned media', () => {
-  it('enters the manifest as public decoration with its owner recorded', async () => {
-    const decoration: LegacyMedia = { ...mediaRow, id: 4189044, model_type: 'App\\Section', model_id: 3398816, file_name: 'pathway.png', generated_conversions: JSON.stringify({ optimized_thumbnail: true }) };
+describe('hub-owned decoration media', () => {
+  it('enters the manifest as public decoration with its owner recorded, unless it is a branding collection', async () => {
+    const logo: LegacyMedia = { ...mediaRow, id: 1, model_type: 'App\\Hub', model_id: 7, collection_name: 'custom-logo', file_name: 'logo.png', generated_conversions: null };
+    expect((await buildManifest({ ...base, media: [logo] }, head)).entries).toEqual([]);
+    const decoration: LegacyMedia = { ...mediaRow, id: 4189044, model_type: 'App\\Hub', model_id: 7, collection_name: 'thumbnails', file_name: 'pathway.png', generated_conversions: JSON.stringify({ optimized_thumbnail: true }) };
     const { entries } = await buildManifest({ ...base, media: [decoration] }, head);
     expect(entries.map((e) => e.variant)).toEqual(['original', 'optimized_thumbnail']);
-    expect(entries[0]).toMatchObject({ legacyFileId: 0, legacyOwner: { type: 'App\\Section', id: 3398816 }, visibility: 'public' });
+    expect(entries[0]).toMatchObject({ legacyFileId: 0, legacyOwner: { type: 'App\\Hub', id: 7 }, visibility: 'public' });
     expect(entries[1]?.cdnUrl).toBe('https://cdn.legacy.example.com/4189044/conversions/pathway-optimized_thumbnail.png');
   });
 });

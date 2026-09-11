@@ -1,4 +1,7 @@
-import { MORPH_FILE, MORPH_PAGE, MORPH_SECTION, type LegacyFile, type LegacyHubFile, type LegacyMedia } from './queries.js';
+import { MORPH_FILE, MORPH_HUB, MORPH_PAGE, MORPH_SECTION, type LegacyFile, type LegacyHubFile, type LegacyMedia } from './queries.js';
+
+/** Hub-owned collections that are branding, written as URLs by the branding mapper, never copied as media. */
+const BRANDING_COLLECTIONS = new Set(['custom-logo', 'custom-login-logo', 'social-image', 'favicons']);
 import { cdnUrlFor, variantsOf } from './mediaPaths.js';
 
 export type AssetVisibility = 'public' | 'restricted';
@@ -73,7 +76,13 @@ export async function buildManifest(
   const missing: Array<{ legacyMediaId: number; variant: string; key: string }> = [];
 
   for (const media of input.media) {
-    const decoration = media.model_type === MORPH_SECTION || media.model_type === MORPH_PAGE;
+    // Page decoration: a section's image lives in the Hub's `thumbnails`
+    // collection and a row background in `background-images`, referenced by
+    // CDN URL from sections.settings. Sections and pages own none themselves.
+    const decoration =
+      media.model_type === MORPH_SECTION ||
+      media.model_type === MORPH_PAGE ||
+      (media.model_type === MORPH_HUB && !BRANDING_COLLECTIONS.has(media.collection_name));
     if (media.model_type !== MORPH_FILE && !decoration) continue;
     const file = decoration ? null : filesById.get(media.model_id);
     if (!decoration && !file) continue;
