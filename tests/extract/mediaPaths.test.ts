@@ -71,6 +71,21 @@ describe('variantsOf', () => {
     expect(variants[1]?.key).toBe('91234/conversions/README-thumb');
   });
 
+  it('forces png for the favicon conversions, which are the only ones with a fixed format', () => {
+    const variants = variantsOf(
+      media({
+        file_name: 'icon.svg',
+        collection_name: 'favicons',
+        generated_conversions: JSON.stringify({ 'favicon-32': true, 'favicon-180': true }),
+      }),
+    );
+    expect(variants.map((v) => v.key)).toEqual([
+      '91234/icon.svg',
+      '91234/conversions/icon-favicon-32.png',
+      '91234/conversions/icon-favicon-180.png',
+    ]);
+  });
+
   it('tolerates malformed generated_conversions JSON by returning only the original', () => {
     expect(variantsOf(media({ generated_conversions: 'not json' })).map((v) => v.variant)).toEqual([
       'original',

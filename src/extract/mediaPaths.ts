@@ -41,7 +41,7 @@ export function variantsOf(media: LegacyMedia): MediaVariant[] {
 
   for (const [name, wasGenerated] of Object.entries(generated)) {
     if (wasGenerated !== true) continue;
-    const fileName = `${base}-${name}${ext}`;
+    const fileName = `${base}-${name}${conversionExtension(name, ext)}`;
     out.push({
       variant: name,
       disk: conversionsDisk,
@@ -50,6 +50,18 @@ export function variantsOf(media: LegacyMedia): MediaVariant[] {
     });
   }
   return out;
+}
+
+/**
+ * Every conversion searchie registers on Hub and File media calls
+ * keepOriginalImageFormat() except the four favicon sizes, which force png
+ * (app/Models/Hub.php:498-517). Hub 'thumbnails' registers optimized_thumbnail
+ * twice; Spatie resolves a name to its first registration, which keeps the
+ * original format, so the webp duplicate never appears in a URL.
+ */
+function conversionExtension(conversionName: string, originalExt: string): string {
+  if (/^favicon-\d+$/.test(conversionName)) return '.png';
+  return originalExt;
 }
 
 /** The legacy cdn_url_function: escape '#', then swap the s3 prefix for the cdn prefix. */
