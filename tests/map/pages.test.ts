@@ -67,3 +67,12 @@ describe('privacyFor', () => {
     expect(privacyFor(page({ privacy: null }), { ...hub, auth: 0 })).toBe('public');
   });
 });
+
+describe('hubSlugFor', () => {
+  it('prefers the legacy custom subdomain, then the first label of the domain', async () => {
+    const { hubSlugFor } = await import('../../src/cli/map.js');
+    expect(hubSlugFor(null, 'alliance.mantalks.com', 7)).toBe('alliance');
+    expect(hubSlugFor('The Club', 'x.example.com', 7)).toBe('the-club');
+    expect(hubSlugFor(null, '', 7)).toBe('hub-7');
+  });
+});

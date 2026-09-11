@@ -50,15 +50,18 @@ program
   .option('--dry-run', 'print every operation and mutate nothing', false)
   .option('--resume <runId>', 'continue an interrupted run')
   .option('--check-access', 'prove the S3 and member prerequisites, then exit', false)
-  .option('--assets-only', 'M2 only: import pending video and rewrite references', false)
+  .option('--assets-only', 'with --resume: copy what --skip-assets left pending and rewrite the pages and playlists that use it', false)
   .option('--break-lock', 'clear a stale lock after printing its owner', false)
   .option('--allow-catalog-drift', 'apply a plan mapped against a different catalog version', false)
   .option('--cleanup-orphans', 'list allocated-but-unverified asset rows older than a day', false)
   .option('--confirm', 'with --cleanup-orphans, actually delete them', false)
+  .option('--skip-assets', 'register and copy no media; record assets as pending-copy, public page images as legacy-linked', false)
+  .option('--hub-slug <slug>', 'override the V3 hub slug from the plan')
+  .option('--publish-held', 'publish pages the fail-closed rule would hold; the report lists them as published-ungated', false)
   .action(async (opts: {
     profile: string; plan: string; mode: string; dryRun: boolean; resume?: string;
     checkAccess: boolean; assetsOnly: boolean; breakLock: boolean; allowCatalogDrift: boolean;
-    cleanupOrphans: boolean; confirm: boolean;
+    cleanupOrphans: boolean; confirm: boolean; skipAssets: boolean; hubSlug?: string; publishHeld: boolean;
   }) => {
     await runApply({
       planPath: opts.plan,
@@ -72,6 +75,9 @@ program
       allowCatalogDrift: opts.allowCatalogDrift,
       cleanupOrphans: opts.cleanupOrphans,
       confirm: opts.confirm,
+      skipAssets: opts.skipAssets,
+      hubSlug: opts.hubSlug ?? null,
+      publishHeld: opts.publishHeld,
     });
   });
 

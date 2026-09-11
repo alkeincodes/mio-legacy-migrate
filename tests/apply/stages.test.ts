@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {
   accessRulesStage, achievementsStage, attachFoldersStage, foldersStage, hubStage,
   navigationItemFor, pageDraftsStage, pageTreesStage, playlistsStage, refResolverFor,
-  spacesStage, type StageContext,
+  spacesStage, assetReferences, type StageContext,
 } from '../../src/apply/stages.js';
 import type { ApiClient } from '../../src/apply/api.js';
 import { LedgerStore } from '../../src/ledger/store.js';
@@ -16,7 +16,7 @@ import type { Profile } from '../../src/config/profile.js';
 
 const profile: Profile = {
   name: 'test', apiBase: 'https://api.example.com', teamId: 'team-1',
-  bucket: 'v3-bucket', region: 'us-east-1', cdnBase: 'https://cdn.member.dev', cdnBaseConfirmed: true,
+  bucket: 'v3-bucket', region: 'us-east-1', cdnBase: 'https://cdn.member.dev', cdnBaseConfirmed: true, hubBase: 'https://hub.example.com',
 };
 
 const header: LedgerHeader = {
@@ -314,5 +314,63 @@ describe('accessRulesStage', () => {
       type: 'access_rules',
       attributes: { target_type: 'section', target_id: 'n1', logic_operator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'seg_1' }, position: 0 }] },
     });
+  });
+});
+
+describe('assetReferences', () => {
+  it('lists every page node and playlist item that points at each asset', () => {
+    const p = plan({
+      pages: [{ legacyPageId: 100, slug: 'home', title: 'Home', pageType: 'generic', privacy: 'public', isHomepage: true, restrictedSectionNodeIds: [],
+        tree: { id: 'r', kind: 'stack', children: [{ id: 'img', kind: 'image', value: 'ledger://asset/91234/original' }] } }],
+      playlists: [{ legacyPlaylistId: 42, title: 'C', description: null, visibility: 'public', items: [{ legacyFileId: 5, position: 3 }] }],
+      assets: [{ legacyFileId: 5, legacyMediaId: 91234, variant: 'original', sourceBucket: 'b', sourceKey: 'k', sizeBytes: 1, etag: 'e', versionId: null, checksumCrc64Nvme: null, mimeType: 'image/png', cdnUrl: 'u', title: 't', visibility: 'public', isVideo: false, folderLegacyIds: [], playlistLegacyIds: [42] }],
+    });
+    expect(assetReferences(p).get('91234/original')).toEqual([
+      { kind: 'page-node', legacyPageId: 100, pageSlug: 'home', nodeId: 'img' },
+      { kind: 'playlist-item', legacyPlaylistId: 42, position: 3 },
+    ]);
+  });
+});
+
+describe('hubStage slug check', () => {
+  it('stops when the backend auto-suffixed a taken slug, after recording the hub it created', async () => {
+    const api = fakeApi({ postId: 'hub_x' });
+    (api as unknown as { post: unknown }).post = async () => ({ data: { id: 'hub_x', attributes: { slug: 'alliance-a1b2c3' } } });
+    const ctx = ctxFor(plan(), api);
+    await expect(hubStage(ctx)).rejects.toThrow(/taken globally.*alliance-a1b2c3/);
+    expect(ctx.store.header.targetHubId).toBe('hub_x');
+  });
+});
+
+describe('pageTreesStage with --publish-held', () => {
+  const gatedPage = {
+    legacyPageId: 100, slug: 'training', title: 'Training', pageType: 'generic',
+    privacy: 'members' as const, isHomepage: false, restrictedSectionNodeIds: ['n1'],
+    tree: { id: 'root', kind: 'stack', children: [{ id: 'n1', kind: 'container', template: 'row', children: [] }] },
+  };
+  const p = plan({
+    pages: [gatedPage],
+    segments: [{ legacySegmentId: 77, name: 'Paid members', conditions: [], mappable: true }],
+    accessRules: [{ targetKind: 'section', targetRef: 'n1', logicOperator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'ledger://segment/77' }, position: 0 }] }],
+  });
+
+  it('publishes the held page, records published-ungated with the legacy segment names, and warns', async () => {
+    const api = fakeApi({ postId: 'pg_1', gets: { '/api/v1/teams/team-1/hubs/hub_1/pages/pg_1': { body: { data: { attributes: { draft_version: 1 } } } } } });
+    const ctx = ctxFor(p, api);
+    ctx.publishedUngated = [];
+    await pageDraftsStage(ctx);
+    await pageTreesStage(ctx, new Set(), true);
+    expect(api.calls.some((c) => c.path.endsWith('/publish'))).toBe(true);
+    expect(ctx.publishedUngated).toEqual([{ slug: 'training', legacySegments: ['Paid members'] }]);
+    expect(ctx.store.find(marker(100))?.referenceHash).toBe('published-ungated');
+    expect(ctx.warnings.some((w) => w.includes('UNGATED') && w.includes('Paid members'))).toBe(true);
+  });
+
+  it('still holds the page without the flag', async () => {
+    const api = fakeApi({ postId: 'pg_1', gets: { '/api/v1/teams/team-1/hubs/hub_1/pages/pg_1': { body: { data: { attributes: { draft_version: 1 } } } } } });
+    const ctx = ctxFor(p, api);
+    await pageDraftsStage(ctx);
+    await pageTreesStage(ctx, new Set(), false);
+    expect(api.calls.some((c) => c.path.endsWith('/publish'))).toBe(false);
   });
 });

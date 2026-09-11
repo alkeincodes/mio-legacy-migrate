@@ -1,7 +1,7 @@
 import { logger } from '../log/logger.js';
 import { assetMarker, generationHash } from '../ledger/marker.js';
 import type { LedgerStore } from '../ledger/store.js';
-import type { AssetLedgerFields, LedgerEntry } from '../ledger/schema.js';
+import type { AssetLedgerFields, AssetReference, LedgerEntry } from '../ledger/schema.js';
 import type { PlanAsset } from '../map/plan.js';
 import { contentHash } from '../map/plan.js';
 import { copyObject, destinationKeyFor, verifyCopy, type S3Ops } from './s3.js';
@@ -13,6 +13,7 @@ export interface AssetRunner {
 
 function fields(asset: PlanAsset, patch: Partial<AssetLedgerFields> = {}): AssetLedgerFields {
   return {
+    references: [],
     sourceBucket: asset.sourceBucket,
     sourceKey: asset.sourceKey,
     sourceEtag: asset.etag,
@@ -58,6 +59,18 @@ function entryFor(
   };
 }
 
+export type AssetStageMode =
+  /** Register, copy and verify every non-video asset. */
+  | 'full'
+  /** Register nothing, copy nothing; record every asset as pending-copy, public images as legacy-linked. */
+  | 'skip'
+  /** Copy what an earlier --skip-assets run left pending-copy or legacy-linked (images), leave video alone. */
+  | 'assets-only';
+
+export function isImage(asset: PlanAsset): boolean {
+  return (asset.mimeType ?? '').startsWith('image/');
+}
+
 export async function runAssetStage(opts: {
   assets: PlanAsset[];
   store: LedgerStore;
@@ -66,16 +79,47 @@ export async function runAssetStage(opts: {
   teamId: string;
   bucket: string;
   sourceHost: string;
+  mode?: AssetStageMode;
+  /** Where each asset (key `mediaId/variant`) is used; recorded on skip so --assets-only can rewrite. */
+  references?: Map<string, AssetReference[]>;
+  /** Legacy CDN URLs that passed the playback prefilter. */
+  playbackOk?: Set<string>;
+  warn?: (reason: string, type: 'asset-pending' | 'approximated') => void;
 }): Promise<void> {
   const runId = opts.store.header.runId;
+  const mode = opts.mode ?? 'full';
+  const warn = opts.warn ?? (() => undefined);
 
   for (const asset of opts.assets) {
     const gen = generationHash(asset.sourceBucket, asset.sourceKey, asset.versionId ?? asset.etag);
     const marker = assetMarker(opts.sourceHost, asset.legacyMediaId, asset.variant, gen);
     const existing = opts.store.find(marker);
-    if (existing?.state === 'verified' || existing?.state === 'legacy-linked') continue;
-
+    const refs = opts.references?.get(`${asset.legacyMediaId}/${asset.variant}`) ?? [];
     const createdAt = existing?.createdAt ?? new Date().toISOString();
+
+    if (mode === 'skip') {
+      if (existing?.state === 'verified') continue;
+      const onPage = refs.some((r) => r.kind === 'page-node');
+      const inPlaylist = refs.some((r) => r.kind === 'playlist-item');
+      const linkable = asset.visibility === 'public' && (isImage(asset) || asset.isVideo) && onPage
+        && (opts.playbackOk?.has(asset.cdnUrl) ?? false);
+      const state: LedgerEntry['state'] = linkable ? 'legacy-linked' : asset.isVideo ? 'pending-import' : 'pending-copy';
+      if (!linkable && inPlaylist && !asset.isVideo) {
+        warn(
+          `asset ${asset.legacyMediaId}/${asset.variant} (${asset.mimeType ?? 'unknown type'}) is in a playlist but stays ${state} under --skip-assets; the playlist item is attached by --assets-only`,
+          'asset-pending',
+        );
+      }
+      opts.store.upsert(entryFor(asset, marker, runId, state, fields(asset, { references: refs }), null, createdAt));
+      continue;
+    }
+
+    if (mode === 'assets-only') {
+      if (asset.isVideo) continue;
+      if (existing?.state !== 'pending-copy' && existing?.state !== 'legacy-linked') continue;
+    } else if (existing?.state === 'verified' || existing?.state === 'legacy-linked') {
+      continue;
+    }
 
     // Video waits for the backend import endpoint (spec section 9).
     if (asset.isVideo) {
@@ -88,7 +132,7 @@ export async function runAssetStage(opts: {
       continue;
     }
 
-    opts.store.upsert(entryFor(asset, marker, runId, 'intent', fields(asset), null, createdAt));
+    opts.store.upsert(entryFor(asset, marker, runId, 'intent', fields(asset, { references: refs }), null, createdAt));
 
     // Reuse across runs: an asset whose marker already exists on the team is adopted.
     const adopted = await opts.runner.listByMarker(marker);
@@ -112,7 +156,7 @@ export async function runAssetStage(opts: {
     opts.store.upsert(
       entryFor(
         asset, marker, runId, 'allocated',
-        fields(asset, { v3FileId: fileId, v3MediaId: mediaId, destinationKey }),
+        fields(asset, { references: refs, v3FileId: fileId, v3MediaId: mediaId, destinationKey }),
         fileId, createdAt,
       ),
     );
@@ -130,7 +174,7 @@ export async function runAssetStage(opts: {
     opts.store.upsert(
       entryFor(
         asset, marker, runId, 'copied',
-        fields(asset, { v3FileId: fileId, v3MediaId: mediaId, destinationKey }),
+        fields(asset, { references: refs, v3FileId: fileId, v3MediaId: mediaId, destinationKey }),
         fileId, createdAt,
       ),
     );
@@ -144,7 +188,7 @@ export async function runAssetStage(opts: {
     opts.store.upsert(
       entryFor(
         asset, marker, runId, 'verified',
-        fields(asset, {
+        fields(asset, { references: refs,
           v3FileId: fileId,
           v3MediaId: mediaId,
           destinationKey,

@@ -11,6 +11,8 @@ const ProfileSchema = z.object({
   cdnBase: z.string().url(),
   /** False until someone has confirmed cdnBase against a real V3 media URL; check-access prints it. */
   cdnBaseConfirmed: z.boolean().default(true),
+  /** Where the hub is served; the hub lives at `${hubBase}/${slug}`. */
+  hubBase: z.string().url().default('https://hub.member.dev'),
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;

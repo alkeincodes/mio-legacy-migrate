@@ -7,7 +7,7 @@ export interface InventoryRow {
   runId: string;
   legacyMediaId: number;
   variant: string;
-  state: 'legacy-linked' | 'pending-import';
+  state: 'legacy-linked' | 'pending-import' | 'pending-copy';
   legacyCdnUrl: string;
 }
 
@@ -22,7 +22,7 @@ export function buildInventory(profileName: string, ledgerRoot = 'ledger'): Inve
       if (!file.endsWith('.json')) continue;
       const ledger = JSON.parse(readFileSync(join(dir, file), 'utf8')) as LedgerFile;
       for (const entry of ledger.entries) {
-        if (entry.state !== 'legacy-linked' && entry.state !== 'pending-import') continue;
+        if (entry.state !== 'legacy-linked' && entry.state !== 'pending-import' && entry.state !== 'pending-copy') continue;
         rows.push({
           legacyHubId: ledger.header.legacyHubId,
           runId: ledger.header.runId,

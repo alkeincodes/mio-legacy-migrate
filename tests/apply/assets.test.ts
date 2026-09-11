@@ -145,3 +145,104 @@ describe('runAssetStage', () => {
     expect(s.find(marker)).not.toBeNull();
   });
 });
+
+describe('runAssetStage in skip mode', () => {
+  const pageRef = { kind: 'page-node' as const, legacyPageId: 100, pageSlug: 'home', nodeId: 'n1' };
+  const playlistRef = { kind: 'playlist-item' as const, legacyPlaylistId: 42, position: 0 };
+  const base = { teamId: 'team-1', bucket: 'v3', sourceHost: 'replica.example.com', mode: 'skip' as const };
+  const markerOf = (key: string, ver: string | null = 'v1', etag = '"abc"') =>
+    assetMarker('replica.example.com', 91234, 'original', generationHash('legacy', key, ver ?? etag));
+
+  it('records every asset as pending-copy with its pinned source and references, registering and copying nothing', async () => {
+    const s = store();
+    const register = vi.fn(async () => ({ fileId: 'f', mediaId: 'm' }));
+    const ops = s3();
+    await runAssetStage({ ...base, assets: [asset()], store: s, s3: ops, runner: { register, listByMarker: vi.fn(async () => []) },
+      references: new Map([['91234/original', [playlistRef]]]), playbackOk: new Set() });
+    const entry = s.find(markerOf('91234/hero.png'))!;
+    expect(entry.state).toBe('pending-copy');
+    expect(entry.asset?.sourceVersionId).toBe('v1');
+    expect(entry.asset?.references).toEqual([playlistRef]);
+    expect(register).not.toHaveBeenCalled();
+    expect(ops.copy).not.toHaveBeenCalled();
+  });
+
+  it('marks a public image on a page as legacy-linked when the prefilter passed', async () => {
+    const s = store();
+    await runAssetStage({ ...base, assets: [asset()], store: s, s3: s3(), runner,
+      references: new Map([['91234/original', [pageRef]]]), playbackOk: new Set(['https://cdn.legacy.example.com/91234/hero.png']) });
+    expect(s.find(markerOf('91234/hero.png'))?.state).toBe('legacy-linked');
+  });
+
+  it('keeps a public image pending-copy when the prefilter did not pass, and a restricted one regardless', async () => {
+    const s = store();
+    await runAssetStage({ ...base, assets: [asset()], store: s, s3: s3(), runner,
+      references: new Map([['91234/original', [pageRef]]]), playbackOk: new Set() });
+    expect(s.find(markerOf('91234/hero.png'))?.state).toBe('pending-copy');
+    const s2 = store();
+    await runAssetStage({ ...base, assets: [asset({ visibility: 'restricted' })], store: s2, s3: s3(), runner,
+      references: new Map([['91234/original', [pageRef]]]), playbackOk: new Set(['https://cdn.legacy.example.com/91234/hero.png']) });
+    expect(s2.find(markerOf('91234/hero.png'))?.state).toBe('pending-copy');
+  });
+
+  it('warns with type asset-pending for a pdf or audio file in a playlist', async () => {
+    const s = store();
+    const warnings: Array<[string, string]> = [];
+    await runAssetStage({ ...base, assets: [asset({ mimeType: 'application/pdf', sourceKey: '91234/deck.pdf' })], store: s, s3: s3(), runner,
+      references: new Map([['91234/original', [playlistRef]]]), playbackOk: new Set(), warn: (r, t) => warnings.push([r, t]) });
+    expect(warnings[0]?.[1]).toBe('asset-pending');
+    expect(s.find(markerOf('91234/deck.pdf'))?.state).toBe('pending-copy');
+  });
+
+  it('records video as pending-import, not pending-copy', async () => {
+    const s = store();
+    await runAssetStage({ ...base, assets: [asset({ isVideo: true, mimeType: 'video/mp4', sourceKey: '91234/a.mp4' })], store: s, s3: s3(), runner,
+      references: new Map(), playbackOk: new Set() });
+    expect(s.find(markerOf('91234/a.mp4'))?.state).toBe('pending-import');
+  });
+});
+
+describe('runAssetStage in assets-only mode', () => {
+  const markerOf = (key: string) => assetMarker('replica.example.com', 91234, 'original', generationHash('legacy', key, 'v1'));
+  const only = { teamId: 'team-1', bucket: 'v3', sourceHost: 'replica.example.com', mode: 'assets-only' as const };
+
+  async function seeded(state: 'pending-copy' | 'legacy-linked' | 'verified', overrides: Partial<PlanAsset> = {}) {
+    const s = store();
+    await runAssetStage({ ...only, mode: 'skip', assets: [asset(overrides)], store: s, s3: s3(), runner, references: new Map(), playbackOk: new Set() });
+    const key = overrides.sourceKey ?? '91234/hero.png';
+    const entry = s.find(markerOf(key))!;
+    s.upsert({ ...entry, state });
+    return s;
+  }
+
+  it('copies a pending-copy image through to verified', async () => {
+    const s = await seeded('pending-copy');
+    const ops = s3();
+    let headCalls = 0;
+    ops.head = vi.fn(async (_b: string, key: string) => {
+      if (!key.startsWith('team-1/')) return { sizeBytes: 1_000, etag: '"abc"', versionId: 'v1', checksumCrc64Nvme: null, contentType: 'image/png' };
+      headCalls += 1;
+      return headCalls === 1 ? null : { sizeBytes: 1_000, etag: '"d"', versionId: null, checksumCrc64Nvme: null, contentType: null };
+    });
+    await runAssetStage({ ...only, assets: [asset()], store: s, s3: ops, runner });
+    expect(s.find(markerOf('91234/hero.png'))?.state).toBe('verified');
+    expect(ops.copy).toHaveBeenCalledTimes(1);
+  });
+
+  it('also copies a legacy-linked image, so the page can be rewritten off the legacy CDN', async () => {
+    const s = await seeded('legacy-linked');
+    const ops = s3();
+    await runAssetStage({ ...only, assets: [asset()], store: s, s3: ops, runner });
+    expect(s.find(markerOf('91234/hero.png'))?.state).toBe('verified');
+  });
+
+  it('leaves video and already-verified entries alone', async () => {
+    const s = await seeded('verified');
+    const ops = s3();
+    await runAssetStage({ ...only, assets: [asset()], store: s, s3: ops, runner });
+    expect(ops.copy).not.toHaveBeenCalled();
+    const v = await seeded('pending-copy', { isVideo: true, mimeType: 'video/mp4', sourceKey: '91234/a.mp4' });
+    await runAssetStage({ ...only, assets: [asset({ isVideo: true, mimeType: 'video/mp4', sourceKey: '91234/a.mp4' })], store: v, s3: ops, runner });
+    expect(ops.copy).not.toHaveBeenCalled();
+  });
+});

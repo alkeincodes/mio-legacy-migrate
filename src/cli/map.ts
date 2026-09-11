@@ -10,6 +10,12 @@ import { SECTION_TABLE } from '../map/sectionTable.js';
 import { writePlan, type Plan, type PlanWarning } from '../map/plan.js';
 import { MORPH_HUB } from '../extract/queries.js';
 
+/** The V3 slug: the legacy custom subdomain when set, else the first label of the legacy domain. */
+export function hubSlugFor(customSubdomain: string | null, domain: string, legacyHubId: number): string {
+  const raw = (customSubdomain ?? domain.split('.')[0] ?? '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+  return raw.length > 0 ? raw : `hub-${legacyHubId}`;
+}
+
 export interface MapOptions {
   bundlePath: string;
   outDir: string;
@@ -66,7 +72,7 @@ export async function runMap(options: MapOptions): Promise<string> {
     assetsPinned: bundle.header.manifestPinned !== false,
     hub: {
       title: bundle.hub.title,
-      slug: bundle.header.legacyHubDomain.split('.')[0] ?? `hub-${bundle.hub.id}`,
+      slug: hubSlugFor(bundle.hub.custom_subdomain, bundle.header.legacyHubDomain, bundle.hub.id),
       description: bundle.hub.description,
       isPrivate: bundle.hub.auth === 1,
     },

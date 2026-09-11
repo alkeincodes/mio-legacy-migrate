@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { loadEnv, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from '../apply/auth.js';
 import { loadProfile } from '../config/profile.js';
@@ -61,7 +62,7 @@ export async function runVerify(opts: {
   });
 
   const runDir = `runs/${opts.runId}`;
-  const v3Origin = `https://hub.member.dev/${plan.hub.slug}`;
+  const v3Origin = `${profile.hubBase.replace(/\/$/, '')}/${plan.hub.slug}`;
   if (!plan.legacyHubDomain) throw new Error('the plan carries no legacyHubDomain; re-run map');
   const legacyOrigin = `https://${plan.legacyHubDomain}`;
 
@@ -124,7 +125,15 @@ ${verdict.accepted ? 'Accepted, pending a named signature above.' : 'Not accepte
 
 ${verdict.failures.map((f) => `- FAIL ${f}`).join('\n') || '- no blocking failures'}
 `;
-  const path = writeReport(markdown, runDir);
+  let ungatedSection = '';
+  const ungatedPath = `${runDir}/published-ungated.json`;
+  if (existsSync(ungatedPath)) {
+    const ungated = JSON.parse(readFileSync(ungatedPath, 'utf8')) as Array<{ slug: string; legacySegments: string[] }>;
+    if (ungated.length > 0) {
+      ungatedSection = `\n## Published ungated\n\nThese pages are open on V3 although legacy gated them (apply --publish-held):\n\n${ungated.map((u) => `- /${u.slug}: ${u.legacySegments.join('; ')}`).join('\n')}\n`;
+    }
+  }
+  const path = writeReport(`${markdown}${ungatedSection}`, runDir);
   logger.info('verify finished', { path, accepted: verdict.accepted, failures: verdict.failures.length });
   return verdict;
 }

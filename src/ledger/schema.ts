@@ -4,7 +4,14 @@ export const LEDGER_VERSION = 1 as const;
 
 export type RecordState = 'intent' | 'done' | 'target-edited';
 export type AssetState =
-  | 'intent' | 'allocated' | 'copied' | 'verified' | 'legacy-linked' | 'pending-import';
+  | 'intent' | 'allocated' | 'copied' | 'verified' | 'legacy-linked' | 'pending-import'
+  /** apply --skip-assets recorded it with its pinned source; apply --assets-only copies it later. */
+  | 'pending-copy';
+
+/** Where an asset is used on the target, so --assets-only can rewrite the references after the copy. */
+export type AssetReference =
+  | { kind: 'page-node'; legacyPageId: number; pageSlug: string; nodeId: string }
+  | { kind: 'playlist-item'; legacyPlaylistId: number; position: number };
 
 export interface AssetLedgerFields {
   sourceBucket: string;
@@ -22,6 +29,8 @@ export interface AssetLedgerFields {
   legacyCdnUrl: string;
   /** Written by M2 when the backend import endpoint exists. Always null in M1. */
   importJobId: string | null;
+  /** Recorded by --skip-assets; absent on entries written by a full run. */
+  references?: AssetReference[];
 }
 
 export interface LedgerEntry {

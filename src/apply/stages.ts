@@ -1,9 +1,10 @@
 import type { Profile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { recordMarker } from '../ledger/marker.js';
-import type { LedgerEntry } from '../ledger/schema.js';
+import type { AssetReference, LedgerEntry } from '../ledger/schema.js';
 import type { LedgerStore } from '../ledger/store.js';
-import { contentHash, type Plan, type PlanNavigationItem } from '../map/plan.js';
+import { contentHash, type Plan, type PlanNavigationItem, type PlanWarning } from '../map/plan.js';
+import type { CatalogNode } from '../map/catalog.js';
 import type { ApiClient } from './api.js';
 import type { EntityKind } from './contracts.js';
 import { adoptOrCreate } from './inflight.js';
@@ -23,10 +24,52 @@ export interface StageContext {
   hubId: string;
   /** Legacy CDN URLs that passed the playback prefilter, keyed by asset cdnUrl. */
   playbackOk: Set<string>;
-  warn(reason: string): void;
+  warn(reason: string, type?: PlanWarning['type']): void;
+  /** Pages published by --publish-held although legacy gated them; the report lists these plainly. */
+  publishedUngated?: Array<{ slug: string; legacySegments: string[] }>;
+}
+
+/** The legacy segment names behind a page's restricted sections, from the plan's rules; unmapped gates are named as such. */
+export function legacySegmentsGating(plan: Plan, page: { restrictedSectionNodeIds: string[] }): string[] {
+  const names = new Set<string>();
+  const byId = new Map(plan.segments.map((s) => [s.legacySegmentId, s.name]));
+  for (const nodeId of page.restrictedSectionNodeIds) {
+    const rule = plan.accessRules.find((r) => r.targetRef === nodeId);
+    if (!rule) { names.add('unmapped legacy gate (deprecated permissions column or unknown segment)'); continue; }
+    for (const condition of rule.conditions) {
+      const match = /^ledger:\/\/segment\/(\d+)$/.exec(String(condition.condition_data['segment_id'] ?? ''));
+      const id = match ? Number(match[1]) : null;
+      names.add(id === null ? 'unmapped legacy gate' : (byId.get(id) ?? `legacy segment ${id}`));
+    }
+  }
+  return [...names];
 }
 
 type JsonApiRow = { id: string; attributes?: Record<string, unknown> };
+
+const ASSET_REF = /^ledger:\/\/asset\/(\d+)\/(.+)$/;
+
+/** Every page node and playlist item that points at each asset, keyed `mediaId/variant`. */
+export function assetReferences(plan: Plan): Map<string, AssetReference[]> {
+  const refs = new Map<string, AssetReference[]>();
+  const add = (key: string, ref: AssetReference): void => { refs.set(key, [...(refs.get(key) ?? []), ref]); };
+  for (const page of plan.pages) {
+    const walk = (node: CatalogNode): void => {
+      const match = typeof node.value === 'string' ? ASSET_REF.exec(node.value) : null;
+      if (match) add(`${match[1]}/${match[2]}`, { kind: 'page-node', legacyPageId: page.legacyPageId, pageSlug: page.slug, nodeId: node.id ?? '' });
+      for (const child of node.children ?? []) walk(child);
+    };
+    walk(page.tree);
+  }
+  const originalByFile = new Map(plan.assets.filter((a) => a.variant === 'original').map((a) => [a.legacyFileId, a.legacyMediaId]));
+  for (const playlist of plan.playlists) {
+    for (const item of playlist.items) {
+      const mediaId = originalByFile.get(item.legacyFileId);
+      if (mediaId !== undefined) add(`${mediaId}/original`, { kind: 'playlist-item', legacyPlaylistId: playlist.legacyPlaylistId, position: item.position });
+    }
+  }
+  return refs;
+}
 
 export function upsertRecord(
   store: LedgerStore,
@@ -128,7 +171,7 @@ export async function hubStage(ctx: StageContext): Promise<string> {
     hash: contentHash(ctx.plan.hub),
     list: (marker) => listByMeta(ctx, `${team(ctx)}/hubs/`, marker),
     create: async (marker) => {
-      const response = await ctx.api.post<{ data: { id: string } }>(
+      const response = await ctx.api.post<{ data: { id: string; attributes?: { slug?: string } } }>(
         `${team(ctx)}/hubs/`,
         {
           data: {
@@ -146,6 +189,15 @@ export async function hubStage(ctx: StageContext): Promise<string> {
         },
         'hubs.create',
       );
+      const assigned = response.data.attributes?.slug;
+      if (assigned !== undefined && assigned !== ctx.plan.hub.slug) {
+        // The backend auto-suffixes a globally taken slug and answers 200
+        // (app/hubs/slug_generator.py). The hub exists now, so record it, then stop.
+        ctx.store.setTargetHubId(response.data.id);
+        throw new Error(
+          `the slug "${ctx.plan.hub.slug}" is taken globally; the backend created hub ${response.data.id} at slug "${assigned}" instead. Rename it (PATCH attributes.slug) or delete it, then resume; the ledger already records the hub.`,
+        );
+      }
       return response.data.id;
     },
   });
@@ -290,7 +342,7 @@ export async function playlistsStage(ctx: StageContext): Promise<void> {
     for (const item of [...playlist.items].sort((a, b) => a.position - b.position)) {
       const asset = verifiedAsset(ctx, item.legacyFileId);
       if (!asset?.v3Id) {
-        ctx.warn(`playlist "${playlist.title}" item for legacy file ${item.legacyFileId} skipped: no verified V3 file (video waits for the import endpoint)`);
+        ctx.warn(`playlist "${playlist.title}" item for legacy file ${item.legacyFileId} skipped: no verified V3 file yet`, 'asset-pending');
         continue;
       }
       wanted.push({ file_id: asset.v3Id, position: item.position });
@@ -364,7 +416,7 @@ export function refResolverFor(ctx: StageContext): RefResolver {
       }
       if (entry.state === 'legacy-linked') return { url: entry.asset.legacyCdnUrl };
       if (
-        entry.state === 'pending-import' &&
+        (entry.state === 'pending-import' || entry.state === 'pending-copy') &&
         entry.asset.visibility === 'public' &&
         ctx.playbackOk.has(entry.asset.legacyCdnUrl)
       ) {
@@ -377,7 +429,7 @@ export function refResolverFor(ctx: StageContext): RefResolver {
   };
 }
 
-export async function pageTreesStage(ctx: StageContext, mappedRuleTargets: Set<string>): Promise<void> {
+export async function pageTreesStage(ctx: StageContext, mappedRuleTargets: Set<string>, publishHeld = false): Promise<void> {
   const resolver = refResolverFor(ctx);
   for (const page of ctx.plan.pages) {
     const marker = recordMarker(ctx.plan.sourceHost, page.legacyPageId, ctx.runId);
@@ -387,8 +439,11 @@ export async function pageTreesStage(ctx: StageContext, mappedRuleTargets: Set<s
 
     const resolved = resolveRefs(page.tree, resolver);
     const hash = contentHash(resolved);
-    const publish = shouldPublish(page, mappedRuleTargets);
-    if (entry?.contentHash === hash && entry.revisionToken !== null && entry.referenceHash === (publish ? 'published' : 'draft')) {
+    const gated = !shouldPublish(page, mappedRuleTargets);
+    const publish = !gated || publishHeld;
+    const finalState = gated && publishHeld ? 'published-ungated' : publish ? 'published' : 'draft';
+    if (entry?.contentHash === hash && entry.revisionToken !== null && entry.referenceHash === finalState) {
+      if (finalState === 'published-ungated') ctx.publishedUngated?.push({ slug: page.slug, legacySegments: legacySegmentsGating(ctx.plan, page) });
       continue;
     }
 
@@ -410,6 +465,11 @@ export async function pageTreesStage(ctx: StageContext, mappedRuleTargets: Set<s
       ctx.warn(`page /${page.slug} left unpublished: a restricted section has no mapped access rule`);
       continue;
     }
+    if (gated) {
+      const legacySegments = legacySegmentsGating(ctx.plan, page);
+      ctx.publishedUngated?.push({ slug: page.slug, legacySegments });
+      ctx.warn(`page /${page.slug} published UNGATED by --publish-held; legacy gated it by: ${legacySegments.join('; ')}`, 'access-unmapped');
+    }
     await ctx.api.post(
       `${team(ctx)}/hubs/${ctx.hubId}/pages/${pageId}/publish`,
       undefined,
@@ -418,7 +478,7 @@ export async function pageTreesStage(ctx: StageContext, mappedRuleTargets: Set<s
     );
     upsertRecord(ctx.store, 'pages', page.legacyPageId, 'page', marker, pageId, 'done', ctx.runId, hash, {
       revisionToken: draftVersion,
-      referenceHash: 'published',
+      referenceHash: finalState,
     });
   }
 }

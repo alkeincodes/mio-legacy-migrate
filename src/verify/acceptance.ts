@@ -59,8 +59,8 @@ export function evaluateAcceptance(input: AcceptanceInput): AcceptanceVerdict {
     : new Set(['verified']);
   for (const entry of input.store.all()) {
     if (entry.kind !== 'asset') continue;
-    if (entry.state === 'pending-import' && input.milestone === 'M1') continue;
-    if (!acceptableAssetStates.has(entry.state) && entry.state !== 'pending-import') {
+    if ((entry.state === 'pending-import' || entry.state === 'pending-copy') && input.milestone === 'M1') continue;
+    if (!acceptableAssetStates.has(entry.state) && entry.state !== 'pending-import' && entry.state !== 'pending-copy') {
       failures.push(`asset ${entry.legacyId}/${entry.variant ?? 'original'} is in state ${entry.state}`);
     }
     if (input.milestone === 'M2' && entry.state !== 'verified') {

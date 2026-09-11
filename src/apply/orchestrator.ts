@@ -6,7 +6,7 @@ import { resolveApiAuth } from './auth.js';
 import { loadProfile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { TOOL_VERSION } from '../version.js';
-import { readPlan, planHash, type Plan } from '../map/plan.js';
+import { readPlan, planHash, type Plan, type PlanAsset } from '../map/plan.js';
 import { fetchCatalog } from '../map/catalog.js';
 import { assertContract, loadContracts, type EntityKind } from './contracts.js';
 import { Budget, budgetIdentity } from './budget.js';
@@ -16,14 +16,14 @@ import { preflight } from './preflight.js';
 import { renderDryRun, type Operation } from './dryRun.js';
 import { LedgerStore, ledgerDir } from '../ledger/store.js';
 import { Lock, assertLedgerClean, HEARTBEAT_INTERVAL_MS } from '../ledger/lock.js';
-import { deleteOrphans, findOrphans, runAssetStage, type AssetRunner } from './assets.js';
+import { deleteOrphans, findOrphans, isImage, runAssetStage, type AssetRunner } from './assets.js';
 import { checkAccess } from './checkAccess.js';
 import { type S3Ops } from './s3.js';
 import { principalsFromEnv, s3OpsFor } from './s3Clients.js';
 import { playbackPrefilter, writePlaybackReport, type PlaybackResult } from './playbackPrefilter.js';
 import { APPLY_ORDER, shouldPublish } from './order.js';
 import {
-  accessRulesStage, achievementsStage, attachFoldersStage, brandingStage, foldersStage, hubStage,
+  accessRulesStage, achievementsStage, assetReferences, attachFoldersStage, brandingStage, foldersStage, hubStage, legacySegmentsGating,
   navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, segmentsStage, spacesStage,
   type StageContext,
 } from './stages.js';
@@ -41,6 +41,12 @@ export interface ApplyOptions {
   allowCatalogDrift: boolean;
   cleanupOrphans: boolean;
   confirm: boolean;
+  /** Register and copy nothing; record every asset as pending-copy, public images as legacy-linked. */
+  skipAssets: boolean;
+  /** Overrides the plan's hub slug; the hub lives at `${profile.hubBase}/${slug}`. */
+  hubSlug: string | null;
+  /** Publish pages the fail-closed rule would hold, and list them as published-ungated. */
+  publishHeld: boolean;
 }
 
 /** Every entity kind apply may touch, checked against docs/contracts.md at startup. */
@@ -53,12 +59,22 @@ export async function runApply(options: ApplyOptions): Promise<string> {
   if (options.mode === 'upsert') {
     throw new Error('--mode upsert is M3; only --mode fresh is implemented');
   }
-  if (options.assetsOnly) {
-    throw new Error('--assets-only requires the backend import endpoint (spec section 9); not available in M1');
+  if (options.assetsOnly && !options.resumeRunId) {
+    throw new Error('--assets-only needs --resume <runId>: it copies what that run left pending-copy or legacy-linked');
+  }
+  if (options.assetsOnly && options.skipAssets) {
+    throw new Error('--assets-only and --skip-assets contradict each other');
   }
 
   const profile = loadProfile(options.profileName);
   const plan: Plan = readPlan(options.planPath);
+  if (options.hubSlug) {
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(options.hubSlug)) {
+      throw new Error(`--hub-slug "${options.hubSlug}" is not a valid slug (lowercase alphanumerics, dashes, underscores)`);
+    }
+    plan.hub.slug = options.hubSlug;
+  }
+  const hubUrl = `${profile.hubBase.replace(/\/$/, '')}/${plan.hub.slug}`;
 
   // The contracts gate: refuse before any mutation if a contract is missing.
   const contracts = loadContracts('docs/contracts.md');
@@ -88,8 +104,18 @@ export async function runApply(options: ApplyOptions): Promise<string> {
 
   if (options.dryRun) {
     // A dry run reads the plan and the public catalog only; no secrets are needed.
-    const operations = planOperations(plan);
+    let linkable: Set<string> | undefined;
+    if (options.skipAssets) {
+      // Real prefilter answers, so the report says how many public images actually link.
+      linkable = new Set<string>();
+      for (const asset of linkCandidates(plan)) {
+        const results = await playbackPrefilter(asset.cdnUrl);
+        if (results.length > 0 && results.every((r) => r.ok)) linkable.add(asset.cdnUrl);
+      }
+    }
+    const operations = planOperations(plan, { skipAssets: options.skipAssets, linkable, publishHeld: options.publishHeld });
     process.stdout.write(`${renderDryRun(operations)}\n`);
+    process.stdout.write(`hub URL: ${hubUrl}\n`);
     return runId;
   }
 
@@ -181,20 +207,32 @@ export async function runApply(options: ApplyOptions): Promise<string> {
   };
 
   const playbackResults: PlaybackResult[] = [];
-  const runWarnings: string[] = [];
+  const runWarnings: Array<{ type: string; reason: string }> = [];
   const ctx: StageContext = {
     plan, store, api, profile, runId,
     hubId: store.header.targetHubId ?? '',
     playbackOk: new Set<string>(),
-    warn: (reason) => { runWarnings.push(reason); logger.warn(reason); },
+    publishedUngated: [],
+    warn: (reason, type = 'approximated') => { runWarnings.push({ type, reason }); logger.warn(reason, { type }); },
   };
   const hubOrigins = plan.legacyHubDomain
     ? [`https://${plan.legacyHubDomain}`, `http://${plan.legacyHubDomain}`]
     : [];
   let mappedRuleTargets = new Set<string>();
+  const references = assetReferences(plan);
+  // --assets-only copies, then rewrites what points at the copies: folders, playlist items, page trees.
+  const stages = options.assetsOnly
+    ? APPLY_ORDER.filter((stage) => stage === 'assets' || stage === 'playlists' || stage === 'pageTrees')
+    : APPLY_ORDER;
+  if (options.assetsOnly) {
+    if (!ctx.hubId) throw new Error(`run ${runId} has no target hub id; nothing to rewrite`);
+    mappedRuleTargets = new Set(
+      store.all().filter((e) => e.kind === 'accessRule' && e.state === 'done').map((e) => e.marker),
+    );
+  }
 
   try {
-    for (const stage of APPLY_ORDER) {
+    for (const stage of stages) {
       logger.info('stage starting', { stage, runId });
       switch (stage) {
         case 'hub':
@@ -214,7 +252,7 @@ export async function runApply(options: ApplyOptions): Promise<string> {
           break;
         case 'assets': {
           // The prefilter gates every legacy URL before it can reach a page node.
-          for (const asset of plan.assets.filter((a) => a.isVideo && a.visibility === 'public')) {
+          for (const asset of linkCandidates(plan, options.skipAssets)) {
             const results = await playbackPrefilter(asset.cdnUrl);
             playbackResults.push(...results);
             if (results.length > 0 && results.every((r) => r.ok)) ctx.playbackOk.add(asset.cdnUrl);
@@ -222,6 +260,9 @@ export async function runApply(options: ApplyOptions): Promise<string> {
           await runAssetStage({
             assets: plan.assets, store, s3, runner: assetRunner,
             teamId: profile.teamId, bucket: profile.bucket, sourceHost: plan.sourceHost,
+            mode: options.assetsOnly ? 'assets-only' : options.skipAssets ? 'skip' : 'full',
+            references, playbackOk: ctx.playbackOk,
+            warn: (reason, type) => ctx.warn(reason, type),
           });
           await attachFoldersStage(ctx);
           break;
@@ -233,7 +274,7 @@ export async function runApply(options: ApplyOptions): Promise<string> {
           await pageDraftsStage(ctx);
           break;
         case 'pageTrees':
-          await pageTreesStage(ctx, mappedRuleTargets);
+          await pageTreesStage(ctx, mappedRuleTargets, options.publishHeld);
           break;
         case 'navigation':
           await navigationStage(ctx, hubOrigins);
@@ -249,6 +290,10 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     }
 
     writeRunWarnings(runWarnings, `runs/${runId}`);
+    writeFileSync(join(`runs/${runId}`, 'published-ungated.json'), JSON.stringify(ctx.publishedUngated ?? [], null, 2), 'utf8');
+    if ((ctx.publishedUngated ?? []).length > 0) {
+      logger.warn('pages published although legacy gated them (--publish-held)', { pages: ctx.publishedUngated });
+    }
     writePlaybackReport(playbackResults, `runs/${runId}`);
     logger.info('apply finished', { runId, ledger: store.path });
     return runId;
@@ -266,12 +311,21 @@ export async function runApply(options: ApplyOptions): Promise<string> {
   }
 }
 
-function writeRunWarnings(warnings: string[], runDir: string): void {
+function writeRunWarnings(warnings: Array<{ type: string; reason: string }>, runDir: string): void {
   mkdirSync(runDir, { recursive: true });
   writeFileSync(join(runDir, 'apply-warnings.json'), JSON.stringify(warnings, null, 2), 'utf8');
 }
 
-function planOperations(plan: Plan): Operation[] {
+/** Public assets a page references that may play or render straight from the legacy CDN. */
+function linkCandidates(plan: Plan, includeImages = true): PlanAsset[] {
+  const onPage = new Set<string>();
+  for (const [key, refs] of assetReferences(plan)) if (refs.some((r) => r.kind === 'page-node')) onPage.add(key);
+  return plan.assets.filter(
+    (a) => a.visibility === 'public' && onPage.has(`${a.legacyMediaId}/${a.variant}`) && (a.isVideo || (includeImages && isImage(a))),
+  );
+}
+
+function planOperations(plan: Plan, mode: { skipAssets: boolean; linkable?: Set<string>; publishHeld?: boolean } = { skipAssets: false }): Operation[] {
   const operations: Operation[] = [];
   let order = 0;
   operations.push({ order: order++, kind: 'hub.create', summary: `create hub "${plan.hub.title}" at slug ${plan.hub.slug}`, detail: { slug: plan.hub.slug } });
@@ -293,7 +347,20 @@ function planOperations(plan: Plan): Operation[] {
   for (const folder of plan.folders) {
     operations.push({ order: order++, kind: 'folder.create', summary: `create folder "${folder.name}"`, detail: { legacyFolderId: folder.legacyFolderId } });
   }
+  const candidates = new Set(linkCandidates(plan).map((a) => a.cdnUrl));
   for (const asset of plan.assets) {
+    if (mode.skipAssets) {
+      const linked = candidates.has(asset.cdnUrl) && (mode.linkable?.has(asset.cdnUrl) ?? false);
+      operations.push({
+        order: order++,
+        kind: linked ? 'asset.legacy-link' : asset.isVideo ? 'asset.pending-import' : 'asset.pending-copy',
+        summary: linked
+          ? `link ${asset.legacyMediaId}/${asset.variant} to its legacy CDN URL (prefilter passed)`
+          : `record ${asset.legacyMediaId}/${asset.variant} as ${asset.isVideo ? 'pending-import' : 'pending-copy'}`,
+        detail: { sourceKey: asset.sourceKey, visibility: asset.visibility, mimeType: asset.mimeType },
+      });
+      continue;
+    }
     operations.push({
       order: order++,
       kind: asset.isVideo ? 'asset.pending' : 'asset.copy',
@@ -313,6 +380,9 @@ function planOperations(plan: Plan): Operation[] {
     operations.push({ order: order++, kind: 'page.tree', summary: `write the tree for /${page.slug}`, detail: { nodes: countNodes(page.tree) } });
     if (shouldPublish(page, mappedTargets)) {
       operations.push({ order: order++, kind: 'page.publish', summary: `publish /${page.slug}`, detail: {} });
+    } else if (mode.publishHeld) {
+      const legacySegments = legacySegmentsGating(plan, page);
+      operations.push({ order: order++, kind: 'page.publish-ungated', summary: `publish /${page.slug} UNGATED; legacy gated it by: ${legacySegments.join('; ')}`, detail: { legacySegments } });
     } else {
       operations.push({ order: order++, kind: 'page.hold', summary: `leave /${page.slug} unpublished: a restricted section has no mapped rule`, detail: { restricted: page.restrictedSectionNodeIds } });
     }
