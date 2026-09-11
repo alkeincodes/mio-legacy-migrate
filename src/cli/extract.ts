@@ -1,4 +1,5 @@
 import { HeadObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { dirname } from 'node:path';
 import { loadEnv, secretsOf } from '../config/env.js';
 import { logger } from '../log/logger.js';
 import { TOOL_VERSION } from '../version.js';
@@ -11,18 +12,58 @@ import {
   fetchSegmentables, fetchSegments, findHubByDomain, MORPH_FILE, MORPH_HUB,
   MORPH_PLAYLIST,
 } from '../extract/queries.js';
-import { buildManifest, type HeadResult, type LegacyGate } from '../extract/manifest.js';
-import { writeBundle, type Bundle } from '../extract/bundle.js';
+import { buildManifest, pinManifest, unpinnedHeadFor, type HeadObjectFn, type HeadResult, type LegacyGate } from '../extract/manifest.js';
+import { readBundle, writeBundle, type Bundle } from '../extract/bundle.js';
+import type { Env } from '../config/env.js';
 
 export interface ExtractOptions {
   domain: string;
   outDir: string;
   checkAccess: boolean;
+  /** Capture the DB snapshot with an unpinned manifest; no AWS values needed. */
+  skipS3: boolean;
+}
+
+function s3Head(env: Env): HeadObjectFn {
+  const s3 = new S3Client({
+    region: env.awsRegion,
+    credentials: { accessKeyId: env.awsAccessKeyId, secretAccessKey: env.awsSecretAccessKey },
+  });
+  return async (bucket, key) => {
+    try {
+      const out = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: 'ENABLED' }));
+      return {
+        sizeBytes: out.ContentLength ?? 0,
+        etag: out.ETag ?? '',
+        versionId: out.VersionId ?? null,
+        checksumCrc64Nvme: out.ChecksumCRC64NVME ?? null,
+        contentType: out.ContentType ?? null,
+      };
+    } catch {
+      return null;
+    }
+  };
+}
+
+/** `extract --s3-only`: pin an unpinned bundle's manifest with the real S3 identity, in place. */
+export async function runPinBundle(bundlePath: string): Promise<string> {
+  const env = loadEnv('.env', { require: ['s3', 'cdn'] });
+  logger.setSecrets(secretsOf(env));
+  const bundle = readBundle(bundlePath);
+  const missing = await pinManifest(bundle.assets, env.legacyS3Bucket, s3Head(env));
+  bundle.assets = bundle.assets.filter((a) => !missing.some((m) => m.key === a.sourceKey));
+  bundle.missingAssets = [...bundle.missingAssets, ...missing];
+  bundle.header.manifestPinned = true;
+  const path = writeBundle(bundle, dirname(bundlePath));
+  logger.info('bundle manifest pinned', { path, assets: bundle.assets.length, missingAssets: bundle.missingAssets.length });
+  return path;
 }
 
 export async function runExtract(options: ExtractOptions): Promise<string> {
   // --check-access opens the tunnel and runs one SELECT, so it needs only the replica values.
-  const env = loadEnv('.env', { replicaOnly: options.checkAccess });
+  const env = loadEnv('.env', {
+    require: options.checkAccess ? [] : options.skipS3 ? ['cdn'] : ['s3', 'cdn'],
+  });
   logger.setSecrets(secretsOf(env));
 
   const tunnel = await Tunnel.open(env);
@@ -108,24 +149,7 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
       fileGates.set(section.model_id, [...(fileGates.get(section.model_id) ?? []), ...gates]);
     }
 
-    const s3 = new S3Client({
-      region: env.awsRegion,
-      credentials: { accessKeyId: env.awsAccessKeyId, secretAccessKey: env.awsSecretAccessKey },
-    });
-    const head = async (bucket: string, key: string): Promise<HeadResult | null> => {
-      try {
-        const out = await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: 'ENABLED' }));
-        return {
-          sizeBytes: out.ContentLength ?? 0,
-          etag: out.ETag ?? '',
-          versionId: out.VersionId ?? null,
-          checksumCrc64Nvme: out.ChecksumCRC64NVME ?? null,
-          contentType: out.ContentType ?? null,
-        };
-      } catch {
-        return null;
-      }
-    };
+    const head = options.skipS3 ? unpinnedHeadFor(media) : s3Head(env);
 
     const { entries, missing } = await buildManifest(
       {
@@ -133,8 +157,9 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
         playlistItems: playlistItems.map((i) => ({ file_id: i.file_id, playlist_id: i.playlist_id })),
         publicPlaylistIds: new Set(playlists.filter((p) => p.privacy === 'public').map((p) => p.id)),
         fileGates,
-        bucket: env.legacyS3Bucket,
-        s3Url: env.legacyS3Url,
+        bucket: options.skipS3 ? '' : env.legacyS3Bucket,
+        // Without the S3 URL the CDN URL is the CDN base plus the key, which is what the prefix swap yields anyway.
+        s3Url: options.skipS3 ? env.legacyCdnUrl : env.legacyS3Url,
         cdnUrl: env.legacyCdnUrl,
       },
       head,
@@ -151,6 +176,7 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
         captureEndedAt: new Date().toISOString(),
         replicaLagSeconds,
         distinctSectionTypes: sectionTypes,
+        manifestPinned: !options.skipS3,
       },
       hub, theme, pages, sections, menuItems, playlists, playlistItems, files,
       hubFiles, folders, media, discussionCategories, achievements,

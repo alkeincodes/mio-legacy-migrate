@@ -12,12 +12,26 @@ legacy-to-V3 IDs from the first run.
     npx playwright install chromium
 
 Fill `.env` from the credentials the team holds. Nothing in it is ever committed,
-pasted into a ticket, or posted to Slack.
+pasted into a ticket, or posted to Slack. **Single-quote any value containing
+`#`, `$` or a space** (`LEGACY_DB_PASSWORD='p#ss w$rd'`): dotenv cuts an
+unquoted value at the first `#`, and the replica then reports a wrong password.
+`loadEnv` warns when it sees that shape.
+
+`V3_API_KEY_MANTALKS_PROD` is optional. Without it, apply and verify log in as
+`V3_VERIFY_LOGIN_EMAIL` through the backend's login route and use the access
+token, so no static key has to be minted for a one-off run.
 
 ## The four stages
 
     npx tsx src/cli/index.ts extract alliance.mantalks.com
     npx tsx src/cli/index.ts map --bundle bundles/<file>
+
+Without AWS values yet, capture first and pin the S3 identities later:
+
+    npx tsx src/cli/index.ts extract alliance.mantalks.com --skip-s3
+    npx tsx src/cli/index.ts extract --s3-only bundles/<file>
+
+A plan mapped from an unpinned bundle can be dry-run but not applied.
     npx tsx src/cli/index.ts apply --profile mantalks-prod --plan plans/<file> --dry-run
     npx tsx src/cli/index.ts apply --profile mantalks-prod --plan plans/<file>
     npx tsx src/cli/index.ts verify --run <runId> --profile mantalks-prod --plan plans/<file>

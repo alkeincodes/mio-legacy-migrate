@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { apiKeyForProfile, loadEnv } from '../../src/config/env.js';
+import { apiKeyForProfile, envFileWarnings, loadEnv } from '../../src/config/env.js';
 
 const COMPLETE = [
   'LEGACY_DB_HOST=searchie-production.cluster-ro.example.rds.amazonaws.com',
@@ -58,6 +58,28 @@ describe('loadEnv with replicaOnly', () => {
   it('still names a missing replica value', () => {
     const path = writeEnv('LEGACY_DB_HOST=h');
     expect(() => loadEnv(path, { replicaOnly: true })).toThrow(/LEGACY_DB_USER/);
+  });
+});
+
+describe('loadEnv with require groups', () => {
+  it('needs only the replica, SSH and CDN values for a --skip-s3 extract', () => {
+    const path = writeEnv(COMPLETE.split('\n').filter((l) => /^(LEGACY_DB|SSH_|LEGACY_CDN)/.test(l)).join('\n'));
+    expect(loadEnv(path, { require: ['cdn'] }).legacyCdnUrl).toBe('https://cdn.legacy.example.com');
+    expect(() => loadEnv(path, { require: ['s3'] })).toThrow(/AWS_ACCESS_KEY_ID/);
+  });
+});
+
+describe('env file warnings', () => {
+  it('flags an unquoted value containing #, which dotenv would truncate', () => {
+    expect(envFileWarnings("LEGACY_DB_PASSWORD=abc#def\nOTHER='a#b'\nX=\"c#d\"")).toEqual([
+      expect.stringContaining('LEGACY_DB_PASSWORD has an unquoted value'),
+    ]);
+  });
+
+  it('warns when the replica password is suspiciously short', () => {
+    const warnings: string[] = [];
+    loadEnv(writeEnv(COMPLETE.replace('LEGACY_DB_PASSWORD=secret', "LEGACY_DB_PASSWORD='short'")), { warn: (m) => warnings.push(m) });
+    expect(warnings.some((w) => w.includes('only 5 characters'))).toBe(true);
   });
 });
 

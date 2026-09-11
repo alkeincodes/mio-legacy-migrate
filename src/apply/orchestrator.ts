@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { loadEnv, apiKeyForProfile, secretsOf } from '../config/env.js';
+import { loadEnv, secretsOf } from '../config/env.js';
+import { resolveApiAuth } from './auth.js';
 import { loadProfile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { TOOL_VERSION } from '../version.js';
@@ -56,10 +57,7 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     throw new Error('--assets-only requires the backend import endpoint (spec section 9); not available in M1');
   }
 
-  const env = loadEnv();
-  logger.setSecrets(secretsOf(env));
   const profile = loadProfile(options.profileName);
-  const apiKey = apiKeyForProfile(options.profileName);
   const plan: Plan = readPlan(options.planPath);
 
   // The contracts gate: refuse before any mutation if a contract is missing.
@@ -88,15 +86,27 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     planHash: planHash(plan),
   };
 
-  const budget = Budget.open(budgetIdentity(profile.teamId, apiKey));
-  const api = new ApiClient({ profile, apiKey, budget });
-  const cli = new MioCli(profile);
-
   if (options.dryRun) {
+    // A dry run reads the plan and the public catalog only; no secrets are needed.
     const operations = planOperations(plan);
     process.stdout.write(`${renderDryRun(operations)}\n`);
     return runId;
   }
+
+  if (plan.assetsPinned === false) {
+    throw new Error(
+      'the plan came from a bundle captured with extract --skip-s3, so its asset identities are unpinned. Run extract --s3-only <bundle>, then map again, before applying.',
+    );
+  }
+
+  const env = loadEnv('.env', { require: ['s3', 'cdn', 'logins'] });
+  logger.setSecrets(secretsOf(env));
+  const auth = await resolveApiAuth(profile, env);
+  logger.setSecrets([...secretsOf(env), auth.token]);
+  const apiKey = auth.token;
+  const budget = Budget.open(budgetIdentity(profile.teamId, auth.budgetSubject));
+  const api = new ApiClient({ profile, apiKey, budget });
+  const cli = new MioCli(profile);
 
   const s3Client = new S3Client({
     region: profile.region,

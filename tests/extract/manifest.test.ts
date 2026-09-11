@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildManifest, type HeadResult } from '../../src/extract/manifest.js';
+import { buildManifest, pinManifest, unpinnedHeadFor, type HeadResult } from '../../src/extract/manifest.js';
 import type { LegacyFile, LegacyMedia } from '../../src/extract/queries.js';
 
 const file: LegacyFile = {
@@ -95,5 +95,23 @@ describe('buildManifest', () => {
     const stray: LegacyMedia = { ...mediaRow, id: 7, model_id: 999, file_name: 'x.png', generated_conversions: null };
     const { entries } = await buildManifest({ ...base, media: [mediaRow, stray] }, head);
     expect(entries.every((e) => e.legacyFileId === 5)).toBe(true);
+  });
+});
+
+describe('unpinnedHeadFor and pinManifest', () => {
+  it('answers from the Spatie row so --skip-s3 carries every key with no S3 identity', async () => {
+    const head = unpinnedHeadFor([mediaRow]);
+    expect(await head('', '91234/intro.png')).toEqual({ sizeBytes: 0, etag: '', versionId: null, checksumCrc64Nvme: null, contentType: 'image/png' });
+    expect(await head('', 'nope')).toBeNull();
+  });
+
+  it('pins an unpinned manifest in place and reports keys that no longer exist', async () => {
+    const { entries } = await buildManifest(base, unpinnedHeadFor([mediaRow]));
+    expect(entries[0]?.etag).toBe('');
+    const missing = await pinManifest(entries, 'legacy-bucket', async (_b, key) =>
+      key.includes('conversions') ? null : { sizeBytes: 77, etag: '"pinned"', versionId: 'v9', checksumCrc64Nvme: 'C', contentType: 'image/png' },
+    );
+    expect(entries[0]).toMatchObject({ sourceBucket: 'legacy-bucket', sizeBytes: 77, etag: '"pinned"', versionId: 'v9', checksumCrc64Nvme: 'C' });
+    expect(missing).toEqual([{ legacyMediaId: 91234, variant: 'optimized_thumbnail', key: '91234/conversions/intro-optimized_thumbnail.png' }]);
   });
 });

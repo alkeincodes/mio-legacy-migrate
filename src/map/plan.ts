@@ -109,6 +109,8 @@ export interface Plan {
   sourceHost: string;
   /** Set by map from the bundle header; older plans may lack it. */
   legacyHubDomain?: string;
+  /** False when the bundle came from `extract --skip-s3`; apply refuses a real run until it is pinned. */
+  assetsPinned?: boolean;
   hub: PlanHub;
   branding: Record<string, string>;
   pages: PlanPage[];

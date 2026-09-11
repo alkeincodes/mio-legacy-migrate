@@ -1,4 +1,5 @@
-import { loadEnv, apiKeyForProfile, secretsOf } from '../config/env.js';
+import { loadEnv, secretsOf } from '../config/env.js';
+import { resolveApiAuth } from '../apply/auth.js';
 import { loadProfile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { contentHash, readPlan } from '../map/plan.js';
@@ -17,17 +18,19 @@ export async function runVerify(opts: {
   planPath: string;
   milestone: 'M1' | 'M2';
 }): Promise<AcceptanceVerdict> {
-  const env = loadEnv();
+  const env = loadEnv('.env', { require: ['cdn', 'logins'] });
   logger.setSecrets(secretsOf(env));
   const profile = loadProfile(opts.profileName);
-  const apiKey = apiKeyForProfile(opts.profileName);
+  const auth = await resolveApiAuth(profile, env);
+  const apiKey = auth.token;
+  logger.setSecrets([...secretsOf(env), apiKey]);
   const plan = readPlan(opts.planPath);
   const store = LedgerStore.open(ledgerDir(profile.name, plan.legacyHubId), opts.runId);
   const hubId = store.header.targetHubId;
   if (!hubId) throw new Error(`run ${opts.runId} has no target hub id; it never got past the hub stage`);
 
   const api = new ApiClient({
-    profile, apiKey, budget: Budget.open(budgetIdentity(profile.teamId, apiKey)),
+    profile, apiKey, budget: Budget.open(budgetIdentity(profile.teamId, auth.budgetSubject)),
   });
 
   const livePages: LiveCounts['pages'] = [];

@@ -1,7 +1,8 @@
 import { ApiClient } from '../apply/api.js';
 import { Budget, budgetIdentity } from '../apply/budget.js';
 import type { ListByMarker } from '../apply/inflight.js';
-import { apiKeyForProfile, loadEnv, secretsOf } from '../config/env.js';
+import { loadEnv, secretsOf } from '../config/env.js';
+import { resolveApiAuth } from '../apply/auth.js';
 import { loadProfile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { parseMarker } from '../ledger/marker.js';
@@ -14,11 +15,12 @@ import type { LedgerStore } from '../ledger/store.js';
  */
 export function markerScanner(store: LedgerStore, profileName: string): ListByMarker {
   return async (marker) => {
-    const env = loadEnv();
+    const env = loadEnv('.env', { require: ['logins'] });
     logger.setSecrets(secretsOf(env));
     const profile = loadProfile(profileName);
-    const apiKey = apiKeyForProfile(profileName);
-    const api = new ApiClient({ profile, apiKey, budget: Budget.open(budgetIdentity(profile.teamId, apiKey)) });
+    const auth = await resolveApiAuth(profile, env);
+    const apiKey = auth.token;
+    const api = new ApiClient({ profile, apiKey, budget: Budget.open(budgetIdentity(profile.teamId, auth.budgetSubject)) });
     const team = `/api/v1/teams/${profile.teamId}`;
     const entry = store.find(marker);
     const parsed = parseMarker(marker);

@@ -116,3 +116,40 @@ export async function buildManifest(
 
   return { entries, missing };
 }
+
+/**
+ * For `extract --skip-s3`: a head that answers from the Spatie row so the
+ * bundle carries every key but no S3 identity. `extract --s3-only` pins it later.
+ */
+export function unpinnedHeadFor(media: LegacyMedia[]): HeadObjectFn {
+  const byKey = new Map<string, LegacyMedia>();
+  for (const row of media) for (const variant of variantsOf(row)) byKey.set(variant.key, row);
+  return async (_bucket, key) => {
+    const row = byKey.get(key);
+    if (!row) return null;
+    return { sizeBytes: row.size, etag: '', versionId: null, checksumCrc64Nvme: null, contentType: row.mime_type };
+  };
+}
+
+/** Fills the S3 identity of every manifest entry in place; returns the keys that were missing. */
+export async function pinManifest(
+  entries: AssetManifestEntry[],
+  bucket: string,
+  head: HeadObjectFn,
+): Promise<Array<{ legacyMediaId: number; variant: string; key: string }>> {
+  const missing: Array<{ legacyMediaId: number; variant: string; key: string }> = [];
+  for (const entry of entries) {
+    const result = await head(bucket, entry.sourceKey);
+    if (!result) {
+      missing.push({ legacyMediaId: entry.legacyMediaId, variant: entry.variant, key: entry.sourceKey });
+      continue;
+    }
+    entry.sourceBucket = bucket;
+    entry.sizeBytes = result.sizeBytes;
+    entry.etag = result.etag;
+    entry.versionId = result.versionId;
+    entry.checksumCrc64Nvme = result.checksumCrc64Nvme;
+    entry.mimeType = result.contentType ?? entry.mimeType;
+  }
+  return missing;
+}

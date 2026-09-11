@@ -20,6 +20,8 @@ export interface BundleHeader {
   captureEndedAt: string;
   replicaLagSeconds: number | 'unavailable';
   distinctSectionTypes: string[];
+  /** False after `extract --skip-s3` until `extract --s3-only` pins the manifest. Absent means pinned. */
+  manifestPinned?: boolean;
 }
 
 export interface Bundle {

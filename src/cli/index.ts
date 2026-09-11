@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { TOOL_VERSION } from '../version.js';
-import { runExtract } from './extract.js';
+import { runExtract, runPinBundle } from './extract.js';
 import { runMap } from './map.js';
 import { runApply } from '../apply/orchestrator.js';
 import { runVerify } from './verify.js';
@@ -18,11 +18,17 @@ program.name('mio-legacy-migrate').version(TOOL_VERSION);
 program
   .command('extract')
   .description('capture one legacy hub from the read replica into a bundle')
-  .argument('<domain>', 'the legacy hub domain, for example alliance.mantalks.com')
+  .argument('[domain]', 'the legacy hub domain, for example alliance.mantalks.com (not needed with --s3-only)')
   .option('--out <dir>', 'bundle output directory', 'bundles')
   .option('--check-access', 'prove the replica credentials and exit without capturing', false)
-  .action(async (domain: string, opts: { out: string; checkAccess: boolean }) => {
-    await runExtract({ domain, outDir: opts.out, checkAccess: opts.checkAccess });
+  .option('--skip-s3', 'capture without AWS values; the manifest stays unpinned until --s3-only', false)
+  .option('--s3-only <bundle>', 'pin the S3 identity of an existing bundle in place, no replica access')
+  .action(async (domain: string, opts: { out: string; checkAccess: boolean; skipS3: boolean; s3Only?: string }) => {
+    if (opts.s3Only) {
+      await runPinBundle(opts.s3Only);
+      return;
+    }
+    await runExtract({ domain, outDir: opts.out, checkAccess: opts.checkAccess, skipS3: opts.skipS3 });
   });
 
 program
