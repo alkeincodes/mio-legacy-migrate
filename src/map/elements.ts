@@ -11,6 +11,8 @@ export interface ElementContext {
   warn(warning: PlanWarning): void;
   /** The legacy media id backing a section that references a File, or null. */
   mediaIdForSection(section: LegacySection): number | null;
+  /** Origins that count as this hub, so a link to them becomes a page action. */
+  hubOrigins?: string[];
 }
 
 function parseSettings(raw: string | null): Record<string, unknown> {
@@ -110,7 +112,7 @@ export function mapElement(
         kind: 'button',
         value: content || 'Open',
         settings: {
-          action: actionFor(url, HUB_ORIGINS),
+          action: actionFor(url, ctx.hubOrigins ?? HUB_ORIGINS),
           variant: 'primary',
           newTab: link?.['newTab'] === true,
         },
