@@ -8,7 +8,7 @@ export interface Operation {
 export function renderDryRun(operations: Operation[]): string {
   const lines: string[] = [];
   for (const op of operations) {
-    lines.push(`${String(op.order).padEnd(3)}${op.kind.padEnd(16)}${op.summary}`);
+    lines.push(`${String(op.order).padEnd(3)}${op.kind.padEnd(20)}${op.summary}`);
   }
 
   const totals = new Map<string, number>();
