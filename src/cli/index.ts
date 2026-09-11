@@ -4,6 +4,13 @@ import { TOOL_VERSION } from '../version.js';
 import { runExtract } from './extract.js';
 import { runMap } from './map.js';
 import { runApply } from '../apply/orchestrator.js';
+import { runVerify } from './verify.js';
+import { buildInventory, renderInventory } from '../verify/inventory.js';
+import { exportJsonl } from '../ledger/exportJsonl.js';
+import { resolveEntry } from '../ledger/resolve.js';
+import { runClean } from './clean.js';
+import { LedgerStore, ledgerDir } from '../ledger/store.js';
+import { markerScanner } from './markerScan.js';
 
 const program = new Command();
 program.name('mio-legacy-migrate').version(TOOL_VERSION);
@@ -55,6 +62,72 @@ program
       breakLock: opts.breakLock,
       allowCatalogDrift: opts.allowCatalogDrift,
     });
+  });
+
+program
+  .command('verify')
+  .description('report on a run, capture a contact sheet and decide acceptance')
+  .requiredOption('--run <runId>', 'the run to verify')
+  .requiredOption('--profile <name>', 'target profile name')
+  .requiredOption('--plan <path>', 'the plan that run applied')
+  .option('--milestone <m>', 'M1 or M2 acceptance rules', 'M1')
+  .action(async (opts: { run: string; profile: string; plan: string; milestone: string }) => {
+    const verdict = await runVerify({
+      runId: opts.run,
+      profileName: opts.profile,
+      planPath: opts.plan,
+      milestone: opts.milestone === 'M2' ? 'M2' : 'M1',
+    });
+    if (!verdict.accepted) process.exitCode = 1;
+  });
+
+program
+  .command('inventory')
+  .description('list every asset that still depends on legacy serving')
+  .requiredOption('--profile <name>', 'target profile name')
+  .action((opts: { profile: string }) => {
+    process.stdout.write(`${renderInventory(buildInventory(opts.profile))}\n`);
+  });
+
+const ledger = program.command('ledger').description('ledger maintenance');
+
+ledger
+  .command('resolve')
+  .description('resolve an entry left uncertain by an in-flight create')
+  .argument('<marker>')
+  .requiredOption('--profile <name>')
+  .requiredOption('--legacy-hub <id>')
+  .requiredOption('--run <runId>')
+  .option('--adopt <id>', 'adopt this target as the entry V3 id')
+  .option('--confirm-absent', 'record that nothing was created, letting the next resume create', false)
+  .action(async (marker: string, opts: { profile: string; legacyHub: string; run: string; adopt?: string; confirmAbsent: boolean }) => {
+    const store = LedgerStore.open(ledgerDir(opts.profile, Number(opts.legacyHub)), opts.run);
+    await resolveEntry({
+      store, marker,
+      list: markerScanner(store, opts.profile),
+      adopt: opts.adopt,
+      confirmAbsent: opts.confirmAbsent,
+    });
+  });
+
+ledger
+  .command('export')
+  .description('emit the ledger as JSONL, one row per entry')
+  .requiredOption('--profile <name>')
+  .requiredOption('--legacy-hub <id>')
+  .requiredOption('--run <runId>')
+  .action((opts: { profile: string; legacyHub: string; run: string }) => {
+    const store = LedgerStore.open(ledgerDir(opts.profile, Number(opts.legacyHub)), opts.run);
+    process.stdout.write(exportJsonl(store));
+  });
+
+program
+  .command('clean')
+  .description('delete local bundles, plans and run artifacts older than a cutoff')
+  .requiredOption('--older-than <spec>', 'for example 30d')
+  .option('--confirm', 'actually delete; without it, only list', false)
+  .action((opts: { olderThan: string; confirm: boolean }) => {
+    runClean({ olderThan: opts.olderThan, confirm: opts.confirm });
   });
 
 await program.parseAsync(process.argv);
