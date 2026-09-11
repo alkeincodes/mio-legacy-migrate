@@ -158,7 +158,16 @@ export async function runBrowserPlaybackChecks(opts: {
         if (message.type() === 'error') consoleErrors.push(message.text());
       });
       const url = `${opts.v3Origin}/${slug}`;
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      try {
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+      } catch (error) {
+        results.push(evaluatePlayback(slug, url, {
+          consoleErrors: [`Failed to load ${url}: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`],
+          videoState: 'absent', textTrackStates: [],
+        }));
+        page.removeAllListeners('console');
+        continue;
+      }
 
       const probe = await page.evaluate(async (windowMs: number) => {
         const video = document.querySelector('video');

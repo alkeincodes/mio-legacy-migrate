@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { loadEnv, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from '../apply/auth.js';
+import { assetReferences } from '../apply/stages.js';
 import { loadProfile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { contentHash, readPlan } from '../map/plan.js';
@@ -76,14 +77,18 @@ export async function runVerify(opts: {
     hubTitle: plan.hub.title, runDir,
   });
 
-  const legacyLinkedPages = new Set(
+  // Only pages whose tree shows a legacy-linked video get the browser check.
+  const legacyLinkedVideo = new Set(
     store.all()
       .filter((e) => e.kind === 'asset' && e.state === 'legacy-linked')
-      .map((e) => e.legacyId),
+      .map((e) => `${e.legacyId}/${e.variant ?? 'original'}`)
+      .filter((key) => plan.assets.some((a) => a.isVideo && `${a.legacyMediaId}/${a.variant}` === key)),
   );
-  const videoSlugs = plan.pages
-    .filter((page) => plan.assets.some((a) => a.isVideo && legacyLinkedPages.has(a.legacyMediaId)))
-    .map((page) => page.slug);
+  const videoSlugs = [...new Set(
+    [...assetReferences(plan).entries()]
+      .filter(([key]) => legacyLinkedVideo.has(key))
+      .flatMap(([, refs]) => refs.filter((r) => r.kind === 'page-node').map((r) => (r as { pageSlug: string }).pageSlug)),
+  )];
   const playback: PlaybackResult[] = await runBrowserPlaybackChecks({ env, v3Origin, slugs: videoSlugs });
   writePlaybackReport(playback, runDir);
 
