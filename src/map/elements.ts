@@ -14,6 +14,8 @@ export interface ElementContext {
   mediaIdForSection(section: LegacySection): number | null;
   /** Origins that count as this hub, so a link to them becomes a page action. */
   hubOrigins?: string[];
+  /** The manifest entry behind a legacy CDN URL, for images stored as settings.thumbnail.url. */
+  assetForUrl?(url: string): { legacyMediaId: number; variant: string } | null;
 }
 
 function parseSettings(raw: unknown): Record<string, unknown> {
@@ -69,15 +71,30 @@ export function mapElement(
     }
 
     case 'image': {
-      const mediaId = ctx.mediaIdForSection(section);
       const out: Record<string, unknown> = { alt: section.title ?? '' };
       if (settings['align'] === 'center') out['alignX'] = 'center';
-      return {
-        id,
-        kind: 'image',
-        value: mediaId === null ? '' : assetRef(mediaId, 'original'),
-        settings: out,
-      };
+      const mediaId = ctx.mediaIdForSection(section);
+      let value = mediaId === null ? '' : assetRef(mediaId, 'original');
+      if (!value) {
+        // The legacy image element keeps its picture at settings.thumbnail.url,
+        // a CDN URL whose Spatie media row is owned by the section itself.
+        const url = (settings['thumbnail'] as Record<string, unknown> | undefined)?.['url'];
+        if (typeof url === 'string' && url.length > 0) {
+          const asset = ctx.assetForUrl?.(url) ?? null;
+          if (asset) {
+            value = assetRef(asset.legacyMediaId, asset.variant);
+          } else {
+            value = url;
+            ctx.warn({
+              pageSlug: ctx.pageSlug,
+              legacySectionId: section.id,
+              type: 'approximated',
+              reason: `image element points at ${url}, which is not in the asset manifest; the URL is used as-is`,
+            });
+          }
+        }
+      }
+      return { id, kind: 'image', value, settings: out };
     }
 
     case 'video': {

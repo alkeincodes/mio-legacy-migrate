@@ -9,8 +9,8 @@ import {
   distinctSectionTypes, fetchAchievements, fetchDiscussionCategories, fetchFiles,
   fetchFolders, fetchHubFiles, fetchHubTheme, fetchMedia, fetchMenuItems, fetchPages,
   fetchPlaylistItems, fetchPlaylists, fetchReplicaLagSeconds, fetchSections,
-  fetchSegmentables, fetchSegments, findHubByDomain, MORPH_FILE, MORPH_HUB,
-  MORPH_PLAYLIST,
+  fetchSegmentables, fetchSegments, findHubByDomain, MORPH_FILE, MORPH_HUB, MORPH_PAGE,
+  MORPH_PLAYLIST, MORPH_SECTION,
 } from '../extract/queries.js';
 import { buildManifest, pinManifest, unpinnedHeadFor, type HeadObjectFn, type HeadResult, type LegacyGate } from '../extract/manifest.js';
 import { readBundle, writeBundle, type Bundle } from '../extract/bundle.js';
@@ -121,9 +121,13 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
       files.map((f) => f.folder_id).filter((id): id is number => id !== null),
     );
 
+    // Page decoration (a section's image, a page's featured image) is Spatie
+    // media owned by the section or page, not by a File.
     const media = await fetchMedia(session, [
       { modelType: MORPH_HUB, modelId: hub.id },
       ...files.map((f) => ({ modelType: MORPH_FILE, modelId: f.id })),
+      ...sections.map((s) => ({ modelType: MORPH_SECTION, modelId: s.id })),
+      ...pages.map((p) => ({ modelType: MORPH_PAGE, modelId: p.id })),
     ]);
 
     const discussionCategories = await fetchDiscussionCategories(session, hub.id);

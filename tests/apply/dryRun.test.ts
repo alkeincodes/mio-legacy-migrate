@@ -7,8 +7,8 @@ describe('renderDryRun', () => {
       { order: 0, kind: 'hub.create', summary: 'create hub "ManTalks Alliance"', detail: { slug: 'alliance' } },
       { order: 1, kind: 'page.create', summary: 'create page /about', detail: { slug: 'about' } },
     ]);
-    expect(text).toContain('0  hub.create          create hub "ManTalks Alliance"');
-    expect(text).toContain('1  page.create         create page /about');
+    expect(text).toContain('0  hub.create              create hub "ManTalks Alliance"');
+    expect(text).toContain('1  page.create             create page /about');
   });
 
   it('prints a totals line per kind so the operator can sanity-check the shape', () => {

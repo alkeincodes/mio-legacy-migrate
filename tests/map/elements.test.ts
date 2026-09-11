@@ -129,3 +129,23 @@ describe('mapElement', () => {
     }
   });
 });
+
+describe('image stored as settings.thumbnail.url', () => {
+  it('resolves the legacy CDN URL to its manifest asset reference', () => {
+    const section = fixture('image');
+    section.model_type = null; section.model_id = null;
+    section.settings = JSON.stringify({ thumbnail: { url: 'https://cdn.legacy.example.com/4189044/conversions/x-optimized_thumbnail.png' } });
+    const node = mapElement(section, 3, { ...ctx(), assetForUrl: (url) => url.includes('4189044') ? { legacyMediaId: 4189044, variant: 'optimized_thumbnail' } : null });
+    expect(node?.value).toBe(assetRef(4189044, 'optimized_thumbnail'));
+  });
+
+  it('falls back to the raw URL with a warning when the manifest does not know it', () => {
+    const section = fixture('image');
+    section.model_type = null; section.model_id = null;
+    section.settings = JSON.stringify({ thumbnail: { url: 'https://elsewhere.example.com/pic.png' } });
+    const warnings: PlanWarning[] = [];
+    const node = mapElement(section, 3, { ...ctx(warnings), assetForUrl: () => null });
+    expect(node?.value).toBe('https://elsewhere.example.com/pic.png');
+    expect(warnings[0]?.reason).toContain('not in the asset manifest');
+  });
+});

@@ -1,4 +1,4 @@
-import { MORPH_FILE, type LegacyFile, type LegacyHubFile, type LegacyMedia } from './queries.js';
+import { MORPH_FILE, MORPH_PAGE, MORPH_SECTION, type LegacyFile, type LegacyHubFile, type LegacyMedia } from './queries.js';
 import { cdnUrlFor, variantsOf } from './mediaPaths.js';
 
 export type AssetVisibility = 'public' | 'restricted';
@@ -10,7 +10,10 @@ export interface LegacyGate {
 }
 
 export interface AssetManifestEntry {
+  /** 0 when the media is owned by a section or page rather than a File. */
   legacyFileId: number;
+  /** The Spatie owner; page decoration is owned by App\\Section or App\\Page. */
+  legacyOwner?: { type: string; id: number };
   legacyMediaId: number;
   variant: string;
   disk: string;
@@ -70,19 +73,22 @@ export async function buildManifest(
   const missing: Array<{ legacyMediaId: number; variant: string; key: string }> = [];
 
   for (const media of input.media) {
-    if (media.model_type !== MORPH_FILE) continue;
-    const file = filesById.get(media.model_id);
-    if (!file) continue;
+    const decoration = media.model_type === MORPH_SECTION || media.model_type === MORPH_PAGE;
+    if (media.model_type !== MORPH_FILE && !decoration) continue;
+    const file = decoration ? null : filesById.get(media.model_id);
+    if (!decoration && !file) continue;
 
-    const playlistIds = playlistsByFile.get(file.id) ?? [];
-    const hubFile = hubFileById.get(file.id);
-    const gates = input.fileGates.get(file.id) ?? [];
+    const playlistIds = file ? (playlistsByFile.get(file.id) ?? []) : [];
+    const hubFile = file ? hubFileById.get(file.id) : undefined;
+    const gates = file ? (input.fileGates.get(file.id) ?? []) : [];
 
-    // Public anywhere in legacy wins, per spec 5.2.
+    // Public anywhere in legacy wins, per spec 5.2. Page decoration (a section's
+    // own image) is served unsigned by the legacy CDN today and follows the
+    // page gate on V3, so it counts as public here.
     const inPublicPlaylist = playlistIds.some((id) => input.publicPlaylistIds.has(id));
-    const explicitlyPublic = file.privacy === 'public' || hubFile?.privacy === 'public';
+    const explicitlyPublic = file?.privacy === 'public' || hubFile?.privacy === 'public';
     const visibility: AssetVisibility =
-      inPublicPlaylist || explicitlyPublic || (gates.length === 0 && !hubFile?.privacy && !file.privacy)
+      decoration || inPublicPlaylist || explicitlyPublic || (gates.length === 0 && !hubFile?.privacy && !file?.privacy)
         ? 'public'
         : 'restricted';
 
@@ -93,7 +99,8 @@ export async function buildManifest(
         continue;
       }
       entries.push({
-        legacyFileId: file.id,
+        legacyFileId: file?.id ?? 0,
+        ...(decoration ? { legacyOwner: { type: media.model_type, id: media.model_id } } : {}),
         legacyMediaId: media.id,
         variant: variant.variant,
         disk: variant.disk,
@@ -105,7 +112,7 @@ export async function buildManifest(
         checksumCrc64Nvme: result.checksumCrc64Nvme,
         mimeType: result.contentType ?? media.mime_type,
         cdnUrl: cdnUrlFor(variant.key, input.s3Url, input.cdnUrl),
-        folderIds: file.folder_id === null ? [] : [file.folder_id],
+        folderIds: file?.folder_id == null ? [] : [file.folder_id],
         playlistIds,
         visibility,
         gates: visibility === 'restricted' ? gates : [],

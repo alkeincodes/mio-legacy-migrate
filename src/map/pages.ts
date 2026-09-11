@@ -74,6 +74,8 @@ export function mapPages(bundle: Bundle): {
     }
   }
 
+  const assetByUrl = new Map(bundle.assets.map((a) => [a.cdnUrl, { legacyMediaId: a.legacyMediaId, variant: a.variant }]));
+
   const sectionsByParent = new Map<number, LegacySection[]>();
   const topLevelByPage = new Map<number, LegacySection[]>();
   for (const section of bundle.sections) {
@@ -109,6 +111,7 @@ export function mapPages(bundle: Bundle): {
             `https://${bundle.header.legacyHubDomain}`,
             `http://${bundle.header.legacyHubDomain}`,
           ],
+          assetForUrl: (url) => assetByUrl.get(url) ?? null,
           mediaIdForSection: (s) =>
             s.model_type === MORPH_FILE && s.model_id !== null
               ? mediaByFileId.get(s.model_id) ?? null

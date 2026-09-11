@@ -100,7 +100,8 @@ export async function runMap(options: MapOptions): Promise<string> {
       checksumCrc64Nvme: a.checksumCrc64Nvme,
       mimeType: a.mimeType,
       cdnUrl: a.cdnUrl,
-      title: bundle.files.find((f) => f.id === a.legacyFileId)?.title ?? `file-${a.legacyFileId}`,
+      title: bundle.files.find((f) => f.id === a.legacyFileId)?.title
+        ?? (a.legacyOwner ? `${a.legacyOwner.type.replace(/^App\\\\/, '').toLowerCase()}-${a.legacyOwner.id}-${a.variant}` : `file-${a.legacyFileId}`),
       visibility: a.visibility,
       isVideo: (a.mimeType ?? '').startsWith('video/'),
       folderLegacyIds: a.folderIds,

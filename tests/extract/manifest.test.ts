@@ -115,3 +115,13 @@ describe('unpinnedHeadFor and pinManifest', () => {
     expect(missing).toEqual([{ legacyMediaId: 91234, variant: 'optimized_thumbnail', key: '91234/conversions/intro-optimized_thumbnail.png' }]);
   });
 });
+
+describe('section-owned media', () => {
+  it('enters the manifest as public decoration with its owner recorded', async () => {
+    const decoration: LegacyMedia = { ...mediaRow, id: 4189044, model_type: 'App\\Section', model_id: 3398816, file_name: 'pathway.png', generated_conversions: JSON.stringify({ optimized_thumbnail: true }) };
+    const { entries } = await buildManifest({ ...base, media: [decoration] }, head);
+    expect(entries.map((e) => e.variant)).toEqual(['original', 'optimized_thumbnail']);
+    expect(entries[0]).toMatchObject({ legacyFileId: 0, legacyOwner: { type: 'App\\Section', id: 3398816 }, visibility: 'public' });
+    expect(entries[1]?.cdnUrl).toBe('https://cdn.legacy.example.com/4189044/conversions/pathway-optimized_thumbnail.png');
+  });
+});
