@@ -107,10 +107,11 @@ export function mapPages(bundle: Bundle): {
   for (const page of ordered) {
     const slug = slugFor(page, taken);
     slugByPage.set(page.id, slug);
-    if (page.slug) {
-      slugByLegacySlug.set(page.slug, slug);
-      if (page.slug !== slug) renames.push({ legacySlug: page.slug, slug, legacyPageId: page.id });
-    }
+    // A legacy page with no slug is addressed by its derived slug (title or type), so a
+    // reserved name reached that way is a rename too.
+    const legacySlug = page.slug ?? (slug.endsWith('-page') && RESERVED_SLUGS.has(slug.slice(0, -5)) ? slug.slice(0, -5) : slug);
+    slugByLegacySlug.set(legacySlug, slug);
+    if (legacySlug !== slug) renames.push({ legacySlug, slug, legacyPageId: page.id });
   }
   const resolvePageSlug = (legacySlug: string): string => slugByLegacySlug.get(legacySlug) ?? legacySlug;
 

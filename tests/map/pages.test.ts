@@ -91,11 +91,14 @@ describe('mapPages renames', () => {
     const bundle = {
       header: { legacyHubId: 7, legacyHubDomain: 'x.example.com' },
       hub: { id: 7, auth: 1 },
-      pages: [page({ id: 1, slug: 'onboarding' }), page({ id: 2, slug: 'about' })],
+      pages: [page({ id: 1, slug: 'onboarding' }), page({ id: 2, slug: 'about' }), page({ id: 3, slug: null, title: 'Login' })],
       sections: [], media: [], segmentables: [], segments: [], assets: [],
     } as unknown as Parameters<typeof mapPages>[0];
     const { renames, pages } = mapPages(bundle);
-    expect(renames).toEqual([{ legacySlug: 'onboarding', slug: 'onboarding-page', legacyPageId: 1 }]);
-    expect(pages.map((p) => p.slug)).toEqual(['about', 'onboarding-page']);
+    expect(renames).toEqual([
+      { legacySlug: 'login', slug: 'login-page', legacyPageId: 3 },
+      { legacySlug: 'onboarding', slug: 'onboarding-page', legacyPageId: 1 },
+    ]);
+    expect(pages.map((p) => p.slug)).toEqual(['login-page', 'about', 'onboarding-page']);
   });
 });
