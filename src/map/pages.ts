@@ -50,7 +50,8 @@ const PAGE_TYPES: Record<string, string> = {
   register: 'register',
   onboarding: 'onboarding',
   discussions: 'discussions-index',
-  content: 'generic',
+  // V3 has a content page type whose slug must be exactly "content" (content_page_slug_type_mismatch).
+  content: 'content',
 };
 
 export function pageTypeFor(legacyType: string): string {
@@ -103,7 +104,15 @@ export function mapPages(bundle: Bundle): {
   const slugByLegacySlug = new Map<string, string>();
   const renames: Array<{ legacySlug: string; slug: string; legacyPageId: number }> = [];
   for (const page of ordered) {
-    const slug = slugFor(page, taken);
+    let slug: string;
+    if (pageTypeFor(page.type) === 'content') {
+      // The backend pins the content page type to the slug "content" and vice versa.
+      slug = 'content';
+      taken.add(slug);
+    } else {
+      const wantsContent = page.slug === 'content' || (!page.slug && (page.title ?? '').trim().toLowerCase() === 'content');
+      slug = slugFor(wantsContent ? { ...page, slug: 'content-page' } : page, taken);
+    }
     slugByPage.set(page.id, slug);
     // A legacy page with no slug is addressed by its derived slug (title or type), so a
     // reserved name reached that way is a rename too.

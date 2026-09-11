@@ -79,3 +79,10 @@ header the route accepts, if any.
   (`app/pages/service.py` `RESERVED_SLUGS`, 23 entries): access-denied, account, align, banned, discussions, editor-fixture, forgot, forgot-password, history, home, legal, login, members, messages, moderation, my-list, notifications, onboarding, payment, playlists, register, reset-password, search. The mapper appends `-page` to any of these, records the
   rename in the plan, rewrites internal links to the new slug, and the verify
   report lists every rename.
+- **The content page type is pinned to the slug `content`** and the slug
+  `content` to that type (`content_page_slug_type_mismatch`). The mapper maps
+  the legacy `content` page type to V3 `content` at that slug and moves any
+  other page off it.
+- **The catalog has no page-level templates.** The root node's `template`
+  (`page-generic`, `page-content`, ...) is not in the catalog and the backend
+  does not validate it; sections below the root must carry catalog templates.

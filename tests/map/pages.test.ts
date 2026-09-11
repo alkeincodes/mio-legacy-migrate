@@ -52,6 +52,7 @@ describe('pageTypeFor', () => {
     expect(pageTypeFor('register')).toBe('register');
     expect(pageTypeFor('onboarding')).toBe('onboarding');
     expect(pageTypeFor('discussions')).toBe('discussions-index');
+    expect(pageTypeFor('content')).toBe('content');
   });
 
   it('falls back to generic for an unknown legacy type', () => {
@@ -98,5 +99,19 @@ describe('mapPages renames', () => {
       { legacySlug: 'onboarding', slug: 'onboarding-page', legacyPageId: 1 },
     ]);
     expect(pages.map((p) => p.slug)).toEqual(['login-page', 'about', 'onboarding-page']);
+  });
+});
+
+describe('the content page', () => {
+  it('keeps type content at slug content, and moves a generic page off that slug', async () => {
+    const { mapPages } = await import('../../src/map/pages.js');
+    const bundle = {
+      header: { legacyHubId: 7, legacyHubDomain: 'x.example.com' },
+      hub: { id: 7, auth: 1 },
+      pages: [page({ id: 1, slug: 'content', type: 'content' }), page({ id: 2, slug: 'content', type: 'page' })],
+      sections: [], media: [], segmentables: [], segments: [], assets: [],
+    } as unknown as Parameters<typeof mapPages>[0];
+    const { pages } = mapPages(bundle);
+    expect(pages.map((p) => `${p.slug}:${p.pageType}`)).toEqual(['content:content', 'content-page:generic']);
   });
 });
