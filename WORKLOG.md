@@ -30,3 +30,31 @@ Deviations from the plan worth knowing:
 - Favicon conversions force png; every other searchie conversion keeps the
   original extension.
 - The plan carries `legacyHubDomain`, so nothing hardcodes the pilot origin.
+
+## 2026-09-12, later: real extract, map and dry-run
+
+The 1045 was dotenv cutting an unquoted `#` out of the password. `loadEnv`
+now warns on that shape. With the password quoted:
+
+- `extract --check-access` passes; legacy hub id is 38827.
+- `extract alliance.mantalks.com --skip-s3` captured 31 pages, 1085 sections,
+  67 playlists (708 items), 517 files, 1475 media rows, 1801 asset variants,
+  64 discussion categories, 4 achievements, 9 segments. Manifest unpinned:
+  run `extract --s3-only <bundle>` once the AWS values land, then map again.
+- `map` against catalog 0.23.6: 0 dropped, 13 approximated (7 legacy
+  `input` elements, 3 onboarding steps, 2 embed-codes, 1 fonts note), no
+  catalog validation warnings. Branding maps colours, dark mode, logo and
+  favicon. 15 access rules, all `in_segment`.
+- `apply --dry-run`: 2075 operations, 26 page publishes, 5 holds (pages
+  gated by segments V3 cannot express yet), 1374 asset copies, 427 videos
+  pending import, 9 segments and 15 rules skipped.
+
+Found and fixed on the real data: mysql2 parses JSON columns into objects, so
+every mapper `JSON.parse` had been failing quietly (now `jsonStrings` on the
+connection plus tolerant parsers); legacy menu links live in `settings.url`
+as a TipTap document; section background images are plain URL strings; the
+theme does carry fonts (reported, not mapped). `apply --dry-run` needs no
+`.env`; a real apply logs in as the verify user when no API key is set.
+
+Still not run: `extract --s3-only`, `apply --check-access`, any real apply,
+`verify`. No apply has touched the target.
