@@ -34,7 +34,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     legacyHubId: 7, sourceHost: 'h',
     hub: { title: 'T', slug: 's', description: null, isPrivate: true },
     branding: {}, pages: [], playlists: [], folders: [], assets: [], spaces: [],
-    achievements: [], segments: [], tags: [], accessRules: [],
+    achievements: [], segments: [], tags: [], accessRules: [], excludedPages: [],
     navigation: { header: [], footer: [], mobile: [] }, warnings: [],
     ...overrides,
   } as Plan;

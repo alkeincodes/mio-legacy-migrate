@@ -154,7 +154,12 @@ ${verdict.failures.map((f) => `- FAIL ${f}`).join('\n') || '- no blocking failur
       ungatedSection = `\n## Published ungated\n\nThese pages are open on V3 although legacy gated them (apply --publish-held):\n\n${ungated.map((u) => `- /${u.slug}: ${u.legacySegments.join('; ')}`).join('\n')}\n`;
     }
   }
-  const path = writeReport(`${markdown}${ungatedSection}`, runDir);
+  let excludedSection = '';
+  const removed = store.all().filter((e) => e.state === 'removed');
+  if (plan.excludedPages.length > 0 || removed.length > 0) {
+    excludedSection = `\n## Excluded pages\n\nNot migrated because V3 serves the surface itself; links to them go to the built-in route:\n\n${plan.excludedPages.map((e) => `- "${e.title}" (legacy ${e.legacyType} page ${e.legacyPageId}) -> /${e.route}`).join('\n') || '- none'}\n\nRemoved from the hub by this run:\n\n${removed.map((e) => `- ${e.kind} ${e.legacyId} (${e.v3Id ?? '?'}): ${e.reason ?? 'no reason recorded'}`).join('\n') || '- none'}\n`;
+  }
+  const path = writeReport(`${markdown}${ungatedSection}${excludedSection}`, runDir);
   logger.info('verify finished', { path, accepted: verdict.accepted, failures: verdict.failures.length });
   return verdict;
 }

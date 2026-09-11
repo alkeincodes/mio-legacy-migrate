@@ -583,6 +583,40 @@ export async function pageTreesStage(ctx: StageContext, mappedRuleTargets: Set<s
 
 // ---------------------------------------------------------------- navigation
 
+// ---------------------------------------------------------------- removals
+
+/**
+ * A page this run created earlier but the plan now excludes (a legacy login,
+ * register, onboarding or discussions page V3 serves itself) is deleted from the
+ * hub and its ledger entry marked removed with the reason. Nothing else is ever
+ * deleted: a page merely missing from the plan is left alone and reported.
+ */
+export async function removalsStage(ctx: StageContext): Promise<Array<{ legacyPageId: number; v3Id: string; reason: string }>> {
+  const removed: Array<{ legacyPageId: number; v3Id: string; reason: string }> = [];
+  const planned = new Set(ctx.plan.pages.map((p) => p.legacyPageId));
+  const excludedById = new Map(ctx.plan.excludedPages.map((e) => [e.legacyPageId, e]));
+  for (const entry of ctx.store.all()) {
+    if (entry.kind !== 'page' || entry.state !== 'done' || !entry.v3Id || planned.has(entry.legacyId)) continue;
+    const excluded = excludedById.get(entry.legacyId);
+    if (!excluded) {
+      ctx.warn(`page ${entry.legacyId} (${entry.v3Id}) is on the hub but no longer in the plan; left in place, delete it by hand if it should go`);
+      continue;
+    }
+    const reason = `excluded: legacy ${excluded.legacyType} page "${excluded.title}"; V3 serves /${excluded.route} itself`;
+    try {
+      await ctx.api.delete(`${team(ctx)}/hubs/${ctx.hubId}/pages/${entry.v3Id}`);
+    } catch (error) {
+      if (!/\b404\b/.test(error instanceof Error ? error.message : String(error))) throw error;
+    }
+    ctx.store.upsert({ ...entry, state: 'removed', reason, updatedAt: new Date().toISOString() });
+    removed.push({ legacyPageId: entry.legacyId, v3Id: entry.v3Id, reason });
+    logger.info('page removed from the hub', { legacyPageId: entry.legacyId, v3Id: entry.v3Id, reason });
+  }
+  return removed;
+}
+
+// ---------------------------------------------------------------- navigation
+
 /** V3 stores url items as root-relative paths only (app/hubs/validation.py:329-354). */
 export function navigationItemFor(
   ctx: StageContext,
@@ -623,13 +657,21 @@ export async function navigationStage(ctx: StageContext, hubOrigins: string[]): 
     footer: build(ctx.plan.navigation.footer),
     mobile: build(ctx.plan.navigation.mobile),
   };
+  // The legacy homepage is the hub's built-in homepage: the typed descriptor
+  // (app/hubs/schemas.py HomepageCustom) points the hub root at that page, so
+  // /<slug> renders it and no menu item needs to.
+  const home = ctx.plan.pages.find((p) => p.isHomepage);
+  const homePageId = home ? v3IdOf(ctx, home.legacyPageId) : null;
+  if (home && !homePageId) ctx.warn(`homepage /${home.slug} has no V3 id; the hub homepage descriptor was not set`);
+  const attributes: Record<string, unknown> = { navigation };
+  if (homePageId) attributes['homepage'] = { kind: 'custom', page_id: homePageId };
   const hub = await ctx.api.get<unknown>(`${team(ctx)}/hubs/${ctx.hubId}`);
   await ctx.api.patch(
     `${team(ctx)}/hubs/${ctx.hubId}`,
-    { data: { type: 'hubs', attributes: { navigation } } },
+    { data: { type: 'hubs', attributes } },
     { ifMatch: hub.etag ?? undefined, op: 'hubs.update' },
   );
-  logger.info('navigation written', { header: navigation.header.length, footer: navigation.footer.length });
+  logger.info('navigation written', { header: navigation.header.length, footer: navigation.footer.length, homepage: homePageId });
 }
 
 // ---------------------------------------------------------------- spaces

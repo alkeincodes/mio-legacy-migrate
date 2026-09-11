@@ -4,7 +4,7 @@ import type { CatalogNode } from './catalog.js';
 import { parseJsonObject } from '../extract/json.js';
 import { mapElement } from './elements.js';
 import { nodeId } from './nodeId.js';
-import type { PlanAccessRule, PlanPage, PlanWarning } from './plan.js';
+import type { PlanAccessRule, PlanExcludedPage, PlanPage, PlanWarning } from './plan.js';
 import { mapSection, type MapContext } from './sections.js';
 import { resolveGate } from './visibility.js';
 
@@ -66,8 +66,22 @@ export function privacyFor(page: LegacyPage, hub: LegacyHub): 'public' | 'member
   return hub.auth === 1 ? 'members' : 'public';
 }
 
-export function mapPages(bundle: Bundle): {
+/**
+ * Legacy page types V3 serves itself (auth flows, onboarding, the community
+ * index). Their pages are not migrated: links to them go to the built-in route
+ * of the same name, their menu items are dropped, and an earlier copy on the
+ * target is deleted on resume.
+ */
+export const DEFAULT_EXCLUDED_PAGE_TYPES: readonly string[] = ['onboarding', 'login', 'register', 'discussions'];
+
+export interface MapPagesOptions {
+  /** Legacy page types to leave out; defaults to DEFAULT_EXCLUDED_PAGE_TYPES. */
+  excludePageTypes?: readonly string[];
+}
+
+export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
   pages: PlanPage[];
+  excluded: PlanExcludedPage[];
   accessRules: PlanAccessRule[];
   warnings: PlanWarning[];
   renames: Array<{ legacySlug: string; slug: string; legacyPageId: number }>;
@@ -75,6 +89,21 @@ export function mapPages(bundle: Bundle): {
   const warnings: PlanWarning[] = [];
   const accessRules: PlanAccessRule[] = [];
   const taken = new Set<string>();
+  const excludeTypes = new Set(options.excludePageTypes ?? DEFAULT_EXCLUDED_PAGE_TYPES);
+  const excluded: PlanExcludedPage[] = [];
+  const excludedRouteById = new Map<number, string>();
+  for (const page of bundle.pages) {
+    if (!excludeTypes.has(page.type)) continue;
+    // The built-in route carries the legacy type's name (login, register, onboarding, discussions).
+    excludedRouteById.set(page.id, page.type);
+    excluded.push({ legacyPageId: page.id, title: page.title ?? page.type, legacyType: page.type, route: page.type });
+    warnings.push({
+      pageSlug: page.slug ?? page.type,
+      legacySectionId: null,
+      type: 'excluded',
+      reason: `legacy page "${page.title ?? page.type}" (type ${page.type}) is not migrated: V3 serves /${page.type} itself; links to it go there and its menu items are dropped`,
+    });
+  }
 
   const mediaByFileId = new Map<number, number>();
   for (const media of bundle.media) {
@@ -99,7 +128,7 @@ export function mapPages(bundle: Bundle): {
   const byPosition = (a: LegacySection, b: LegacySection): number => a.position - b.position;
 
   // Slug order, because legacy pages carry no ordering column.
-  const ordered = [...bundle.pages].sort((a, b) => (a.slug ?? '') < (b.slug ?? '') ? -1 : 1);
+  const ordered = [...bundle.pages].filter((pg) => !excludedRouteById.has(pg.id)).sort((a, b) => (a.slug ?? '') < (b.slug ?? '') ? -1 : 1);
   const pages: PlanPage[] = [];
 
   // Assign every slug first so a link to a renamed page can resolve while its tree is mapped.
@@ -125,12 +154,20 @@ export function mapPages(bundle: Bundle): {
   }
   // A link to a slug V3 reserves for a built-in route (discussions, login, ...)
   // should reach that route, not the renamed legacy copy of the page.
+  // An excluded page reached by its own legacy slug goes to the built-in route too.
+  const excludedRouteBySlug = new Map<string, string>();
+  for (const page of bundle.pages) {
+    const route = excludedRouteById.get(page.id);
+    if (route) excludedRouteBySlug.set(page.slug ?? route, route);
+  }
   const resolvePageSlug = (legacySlug: string): string =>
-    RESERVED_SLUGS.has(legacySlug) ? legacySlug : (slugByLegacySlug.get(legacySlug) ?? legacySlug);
+    RESERVED_SLUGS.has(legacySlug) ? legacySlug : (excludedRouteBySlug.get(legacySlug) ?? slugByLegacySlug.get(legacySlug) ?? legacySlug);
   // By id: the built-in route for a page V3 replaces (discussions, login, register), else the migrated slug.
   const legacySlugByPage = new Map<number, string>();
   for (const [legacySlug, slug] of slugByLegacySlug) { const page = ordered.find((pg) => slugByPage.get(pg.id) === slug); if (page) legacySlugByPage.set(page.id, legacySlug); }
   const routeSlugById = (legacyPageId: number): string | null => {
+    const route = excludedRouteById.get(legacyPageId);
+    if (route) return route;
     const legacySlug = legacySlugByPage.get(legacyPageId);
     if (legacySlug && RESERVED_SLUGS.has(legacySlug)) return legacySlug;
     return slugByPage.get(legacyPageId) ?? null;
@@ -211,5 +248,5 @@ export function mapPages(bundle: Bundle): {
     });
   }
 
-  return { pages, accessRules, warnings, renames };
+  return { pages, excluded, accessRules, warnings, renames };
 }

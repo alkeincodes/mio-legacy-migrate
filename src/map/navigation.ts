@@ -36,6 +36,8 @@ export function mapNavigation(
   slugByPageId: Map<number, string>,
   /** Legacy page types by id; a discussions page becomes V3's typed discussions item. */
   pageTypeById: Map<number, string> = new Map(),
+  /** Pages the plan leaves out; a menu item pointing at one is dropped (the discussions item stays, as V3's own). */
+  excludedPageIds: Set<number> = new Set(),
 ): { navigation: PlanNavigation; warnings: PlanWarning[] } {
   const warnings: PlanWarning[] = [];
   const navigation: PlanNavigation = { header: [], footer: [], mobile: [] };
@@ -59,6 +61,15 @@ export function mapNavigation(
     if (item.type === 'page' || item.model_type === MORPH_PAGE) {
       if (item.model_id !== null && pageTypeById.get(item.model_id) === 'discussions') {
         bucket.push({ type: 'discussions', label, position: bucket.length });
+        continue;
+      }
+      if (item.model_id !== null && excludedPageIds.has(item.model_id)) {
+        warnings.push({
+          pageSlug: null,
+          legacySectionId: null,
+          type: 'excluded',
+          reason: `navigation item "${label}" (menu item ${item.id}) points at excluded legacy page ${item.model_id}, a ${pageTypeById.get(item.model_id) ?? 'built-in'} surface V3 serves itself; dropped from navigation`,
+        });
         continue;
       }
       const slug = item.model_id === null ? undefined : slugByPageId.get(item.model_id);

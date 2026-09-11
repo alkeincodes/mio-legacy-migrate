@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   accessRulesStage, achievementsStage, attachFoldersStage, foldersStage, hubStage,
-  navigationItemFor, pageDraftsStage, pageTreesStage, playlistsStage, refResolverFor,
+  navigationItemFor, navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, refResolverFor, removalsStage,
   segmentsStage, spacesStage, tagsStage, assetReferences, type StageContext,
 } from '../../src/apply/stages.js';
 import type { ApiClient } from '../../src/apply/api.js';
@@ -71,7 +71,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     legacyHubId: 7, sourceHost: 'replica.example.com',
     hub: { title: 'ManTalks', slug: 'alliance', description: null, isPrivate: true },
     branding: {}, pages: [], playlists: [], folders: [], assets: [], spaces: [],
-    achievements: [], segments: [], tags: [], accessRules: [],
+    achievements: [], segments: [], tags: [], accessRules: [], excludedPages: [],
     navigation: { header: [], footer: [], mobile: [] }, warnings: [],
     ...overrides,
   };
@@ -448,5 +448,63 @@ describe('pageTreesStage with --publish-held', () => {
     await pageDraftsStage(ctx);
     await pageTreesStage(ctx, new Set(), false);
     expect(api.calls.some((c) => c.path.endsWith('/publish'))).toBe(false);
+  });
+});
+
+describe('removalsStage', () => {
+  const pageEntry = (legacyId: number, v3Id: string) => ({
+    legacyTable: 'pages', legacyId, kind: 'page' as const, variant: null, marker: marker(legacyId), v3Id, state: 'done' as const,
+    runId: 'run-1', createdAt: 'x', updatedAt: 'x', contentHash: 'c', referenceHash: 'published', revisionToken: '1', asset: null,
+  });
+
+  it('deletes the copy of an excluded page an earlier run created and marks the entry removed with the reason', async () => {
+    const api = fakeApi();
+    const ctx = ctxFor(plan({ excludedPages: [{ legacyPageId: 280340, title: 'Login', legacyType: 'login', route: 'login' }] }), api);
+    ctx.store.upsert(pageEntry(280340, 'pg_login'));
+    const removed = await removalsStage(ctx);
+    expect(api.calls).toEqual([{ method: 'DELETE', path: '/api/v1/teams/team-1/hubs/hub_1/pages/pg_login' }]);
+    expect(removed).toEqual([{ legacyPageId: 280340, v3Id: 'pg_login', reason: 'excluded: legacy login page "Login"; V3 serves /login itself' }]);
+    expect(ctx.store.find(marker(280340))).toMatchObject({ state: 'removed', reason: expect.stringContaining('/login') });
+  });
+
+  it('leaves a page that is merely missing from the plan alone, and says so', async () => {
+    const api = fakeApi();
+    const ctx = ctxFor(plan(), api);
+    ctx.store.upsert(pageEntry(555, 'pg_stray'));
+    expect(await removalsStage(ctx)).toEqual([]);
+    expect(api.calls).toEqual([]);
+    expect(ctx.store.find(marker(555))?.state).toBe('done');
+    expect(ctx.warnings[0]).toContain('no longer in the plan');
+  });
+
+  it('treats an already deleted page as removed', async () => {
+    const api = fakeApi();
+    (api as unknown as { delete: unknown }).delete = async () => { throw new Error('DELETE .../pages/pg_login answered 404'); };
+    const ctx = ctxFor(plan({ excludedPages: [{ legacyPageId: 280340, title: 'Login', legacyType: 'login', route: 'login' }] }), api);
+    ctx.store.upsert(pageEntry(280340, 'pg_login'));
+    expect(await removalsStage(ctx)).toHaveLength(1);
+    expect(ctx.store.find(marker(280340))?.state).toBe('removed');
+  });
+});
+
+describe('navigationStage homepage', () => {
+  it('points the hub homepage descriptor at the migrated legacy homepage in the same PATCH as the navigation', async () => {
+    const api = fakeApi({ postId: 'pg_home' });
+    const ctx = ctxFor(plan({ pages: [{ legacyPageId: 386957, slug: 'home-page', title: 'Home', pageType: 'generic', privacy: 'members', isHomepage: true, restrictedSectionNodeIds: [], tree: { id: 'r', kind: 'stack', children: [] } }] }), api);
+    await pageDraftsStage(ctx);
+    await navigationStage(ctx, []);
+    const patch = api.calls.find((c) => c.method === 'PATCH')!;
+    expect((patch.body as { data: { attributes: Record<string, unknown> } }).data.attributes).toEqual({
+      navigation: { header: [], footer: [], mobile: [] },
+      homepage: { kind: 'custom', page_id: 'pg_home' },
+    });
+  });
+
+  it('writes no descriptor when the plan has no homepage', async () => {
+    const api = fakeApi();
+    const ctx = ctxFor(plan(), api);
+    await navigationStage(ctx, []);
+    const patch = api.calls.find((c) => c.method === 'PATCH')!;
+    expect((patch.body as { data: { attributes: Record<string, unknown> } }).data.attributes).not.toHaveProperty('homepage');
   });
 });

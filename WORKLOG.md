@@ -229,3 +229,21 @@ Archived). Not applied yet; needs the lead's go for
 mantalks-prod`. Note for verify: the hub member alkein@membership.io joined
 under 30 days ago, so after the apply they see the "First 30 Days" hero
 (Start Here), not the "Post 30 Days" one the user called correct.
+
+## 2026-09-12 (later still): exclusions, built-in homepage, header colour
+
+Lead's GO for the resumed apply came with two additions, and the user flagged
+the header colour. Legacy login, register, onboarding and discussions pages
+are now excluded by default (`map --exclude-pages`, warning type `excluded`);
+links to them resolve to V3's built-in routes, their menu items drop (the
+COMMUNITY item stays as V3's typed discussions item), and a new `removals`
+stage deletes the four copies the first run created, marking their ledger
+entries `removed` with the reason. The legacy homepage becomes the hub's
+homepage through the typed descriptor written with the navigation PATCH; the
+page stays at `home-page` because the descriptor needs a page and `home` is
+reserved. Header: the legacy theme's `sections.header` is a custom colour
+(#878C6A, accent #F7F2E8) and the mapper had used the page background; fixed,
+with `dark_mode` now a boolean and Mulish mapped to `font_heading`/`font_body`.
+
+Plan `plans/hub-38827-ebc05c331c95.json`: 27 pages, 4 excluded, 3 tags, 5
+segments, 12 rules, 26 published gated, 1 published ungated (home-archived).

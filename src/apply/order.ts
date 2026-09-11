@@ -3,7 +3,7 @@ import type { PlanPage } from '../map/plan.js';
 
 export type StageName =
   | 'hub' | 'branding' | 'tags' | 'segments' | 'accessRules' | 'folders' | 'assets'
-  | 'playlists' | 'pageDrafts' | 'pageTrees' | 'navigation' | 'spaces' | 'achievements';
+  | 'playlists' | 'pageDrafts' | 'pageTrees' | 'removals' | 'navigation' | 'spaces' | 'achievements';
 
 /**
  * The single executable order from spec 6.5. Tags precede segments because a
@@ -14,7 +14,7 @@ export type StageName =
  */
 export const APPLY_ORDER: StageName[] = [
   'hub', 'branding', 'tags', 'segments', 'accessRules', 'folders', 'assets',
-  'playlists', 'pageDrafts', 'pageTrees', 'navigation', 'spaces', 'achievements',
+  'playlists', 'pageDrafts', 'pageTrees', 'removals', 'navigation', 'spaces', 'achievements',
 ];
 
 /** Fail-closed: a restricted section with no mapped rule keeps the page unpublished. */

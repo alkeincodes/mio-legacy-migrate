@@ -24,7 +24,7 @@ import { playbackPrefilter, writePlaybackReport, type PlaybackResult } from './p
 import { APPLY_ORDER, shouldPublish } from './order.js';
 import {
   accessRulesStage, achievementsStage, assetReferences, attachFoldersStage, brandingStage, doneEntriesDiffering, foldersStage, hubStage, legacySegmentsGating,
-  navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, segmentsStage, tagsStage, spacesStage,
+  navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, removalsStage, segmentsStage, tagsStage, spacesStage,
   type StageContext,
 } from './stages.js';
 import type { LedgerHeader } from '../ledger/schema.js';
@@ -223,6 +223,7 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     ? [`https://${plan.legacyHubDomain}`, `http://${plan.legacyHubDomain}`]
     : [];
   let mappedRuleTargets = new Set<string>();
+  const removedPages: Array<{ legacyPageId: number; v3Id: string; reason: string }> = [];
   const references = assetReferences(plan);
 
   if (options.resumeRunId && store.header.planHash !== header.planHash) {
@@ -306,6 +307,9 @@ export async function runApply(options: ApplyOptions): Promise<string> {
         case 'pageTrees':
           await pageTreesStage(ctx, mappedRuleTargets, options.publishHeld);
           break;
+        case 'removals':
+          removedPages.push(...await removalsStage(ctx));
+          break;
         case 'navigation':
           await navigationStage(ctx, hubOrigins);
           break;
@@ -321,6 +325,7 @@ export async function runApply(options: ApplyOptions): Promise<string> {
 
     writeRunWarnings(runWarnings, `runs/${runId}`);
     writeFileSync(join(`runs/${runId}`, 'published-ungated.json'), JSON.stringify(ctx.publishedUngated ?? [], null, 2), 'utf8');
+    writeFileSync(join(`runs/${runId}`, 'removed-pages.json'), JSON.stringify(removedPages, null, 2), 'utf8');
     if ((ctx.publishedUngated ?? []).length > 0) {
       logger.warn('pages published although legacy gated them (--publish-held)', { pages: ctx.publishedUngated });
     }
@@ -418,6 +423,9 @@ function planOperations(plan: Plan, mode: { skipAssets: boolean; linkable?: Set<
   for (const page of plan.pages) {
     operations.push({ order: order++, kind: 'page.create', summary: `create draft page /${page.slug}`, detail: { privacy: page.privacy } });
   }
+  for (const excluded of plan.excludedPages) {
+    operations.push({ order: order++, kind: 'page.exclude', summary: `leave out legacy ${excluded.legacyType} page "${excluded.title}" (V3 serves /${excluded.route}); a copy from an earlier run is deleted on resume`, detail: { legacyPageId: excluded.legacyPageId } });
+  }
   for (const page of plan.pages) {
     operations.push({ order: order++, kind: 'page.tree', summary: `write the tree for /${page.slug}`, detail: { nodes: countNodes(page.tree) } });
     if (shouldPublish(page, mappedTargets)) {
@@ -429,7 +437,8 @@ function planOperations(plan: Plan, mode: { skipAssets: boolean; linkable?: Set<
       operations.push({ order: order++, kind: 'page.hold', summary: `leave /${page.slug} unpublished: a restricted section has no mapped rule`, detail: { restricted: page.restrictedSectionNodeIds } });
     }
   }
-  operations.push({ order: order++, kind: 'navigation.write', summary: `write ${plan.navigation.header.length} header and ${plan.navigation.footer.length} footer items`, detail: {} });
+  const home = plan.pages.find((p) => p.isHomepage);
+  operations.push({ order: order++, kind: 'navigation.write', summary: `write ${plan.navigation.header.length} header and ${plan.navigation.footer.length} footer items${home ? ` and point the hub homepage at /${home.slug}` : ''}`, detail: {} });
   for (const space of plan.spaces) {
     operations.push({ order: order++, kind: 'space.create', summary: `create space "${space.name}"`, detail: { accessLevel: space.accessLevel } });
   }

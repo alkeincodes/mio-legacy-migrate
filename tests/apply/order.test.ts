@@ -8,6 +8,8 @@ describe('APPLY_ORDER', () => {
     expect(APPLY_ORDER.indexOf('tags')).toBeLessThan(APPLY_ORDER.indexOf('segments'));
     expect(APPLY_ORDER.indexOf('segments')).toBeLessThan(APPLY_ORDER.indexOf('assets'));
     expect(APPLY_ORDER.indexOf('accessRules')).toBeLessThan(APPLY_ORDER.indexOf('playlists'));
+    expect(APPLY_ORDER.indexOf('removals')).toBeGreaterThan(APPLY_ORDER.indexOf('pageTrees'));
+    expect(APPLY_ORDER.indexOf('removals')).toBeLessThan(APPLY_ORDER.indexOf('navigation'));
     expect(APPLY_ORDER.indexOf('accessRules')).toBeLessThan(APPLY_ORDER.indexOf('pageTrees'));
   });
 

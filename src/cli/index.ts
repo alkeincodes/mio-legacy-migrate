@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { TOOL_VERSION } from '../version.js';
 import { runExtract, runPinBundle } from './extract.js';
 import { runMap } from './map.js';
+import { DEFAULT_EXCLUDED_PAGE_TYPES } from '../map/pages.js';
 import { runApply } from '../apply/orchestrator.js';
 import { runVerify } from './verify.js';
 import { buildInventory, renderInventory } from '../verify/inventory.js';
@@ -37,8 +38,10 @@ program
   .requiredOption('--bundle <path>', 'path to the bundle JSON')
   .option('--out <dir>', 'plan output directory', 'plans')
   .option('--api-base <url>', 'API base to read the catalog from', 'https://api.member.dev')
-  .action(async (opts: { bundle: string; out: string; apiBase: string }) => {
-    await runMap({ bundlePath: opts.bundle, outDir: opts.out, apiBase: opts.apiBase });
+  .option('--exclude-pages <types>', 'comma-separated legacy page types to leave out because V3 serves them itself', DEFAULT_EXCLUDED_PAGE_TYPES.join(','))
+  .action(async (opts: { bundle: string; out: string; apiBase: string; excludePages: string }) => {
+    const excludePageTypes = opts.excludePages.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
+    await runMap({ bundlePath: opts.bundle, outDir: opts.out, apiBase: opts.apiBase, excludePageTypes });
   });
 
 program

@@ -2,7 +2,8 @@ import type { EntityKind } from '../apply/contracts.js';
 
 export const LEDGER_VERSION = 1 as const;
 
-export type RecordState = 'intent' | 'done' | 'target-edited';
+/** `removed`: the target record was deleted on purpose (an excluded page); `reason` says why. */
+export type RecordState = 'intent' | 'done' | 'target-edited' | 'removed';
 export type AssetState =
   | 'intent' | 'allocated' | 'copied' | 'verified' | 'legacy-linked' | 'pending-import'
   /** apply --skip-assets recorded it with its pinned source; apply --assets-only copies it later. */
@@ -50,6 +51,8 @@ export interface LedgerEntry {
   /** The target's revision token at the last successful write. Read by M3 upsert. */
   revisionToken: string | null;
   asset: AssetLedgerFields | null;
+  /** Why a `removed` entry was removed; absent otherwise. */
+  reason?: string;
 }
 
 export interface LedgerHeader {

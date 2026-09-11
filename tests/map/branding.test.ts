@@ -37,9 +37,9 @@ describe('mapBranding', () => {
     expect(warnings[0]?.reason).toContain('#fff');
   });
 
-  it('carries dark mode through as a flag', () => {
+  it('carries dark mode through as the boolean the hub types it as', () => {
     const { branding } = mapBranding(theme({ darkMode: true }), [], CDN, S3);
-    expect(branding['dark_mode']).toBe('true');
+    expect(branding['dark_mode']).toBe(true);
   });
 
   it('resolves the logo media collection to an absolute https CDN URL', () => {
@@ -64,9 +64,12 @@ describe('mapBranding', () => {
     expect(branding['favicon_url']).toBe('https://cdn.legacy.example.com/558/fav.png');
   });
 
-  it('emits no font keys, because legacy has no per-hub font setting', () => {
-    const { branding } = mapBranding(theme({ colors: { primary: '#F7B01E' } }), [], CDN, S3);
-    expect(Object.keys(branding).some((k) => k.startsWith('font'))).toBe(false);
+  it('maps the legacy font names onto font_heading and font_body, which the hub loads from Google Fonts by family name', () => {
+    const { branding, warnings } = mapBranding(theme({ fonts: { body: 'Mulish', heading: 'Mulish' } }), [], CDN, S3);
+    expect(branding['font_heading']).toBe('Mulish');
+    expect(branding['font_body']).toBe('Mulish');
+    expect(warnings).toEqual([]);
+    expect(Object.keys(mapBranding(theme({}), [], CDN, S3).branding).some((k) => k.startsWith('font'))).toBe(false);
   });
 
   it('returns an empty branding map and a warning when the hub has no theme row', () => {
@@ -88,6 +91,22 @@ describe('theme mode and primary', () => {
     expect(hubSettings).toEqual({ background: { type: 'custom' } });
     expect(branding['header_color']).toBe('#333333');
     expect(branding['header_accent']).toBe('#FAFAFA');
+  });
+
+  it('paints the header with the legacy header section colour and accent when the theme sets them', () => {
+    const { branding } = mapBranding(theme({
+      colors: { background: '#333333', text: '#FAFAFA' },
+      sections: { header: { color: '#878C6A', background: { type: 'custom-color' }, accentColor: '#F7F2E8', menuLayout: 'tabs' } },
+    }), [], CDN, S3);
+    expect(branding['header_color']).toBe('#878C6A');
+    expect(branding['header_accent']).toBe('#F7F2E8');
+    expect(branding['background']).toBe('#333333');
+    // A header that is not custom-coloured keeps the page background.
+    const plain = mapBranding(theme({ colors: { background: '#333333', text: '#FAFAFA' }, sections: { header: { color: '#878C6A', background: { type: 'theme' } } } }), [], CDN, S3).branding;
+    expect(plain['header_color']).toBe('#333333');
+    const bad = mapBranding(theme({ colors: { background: '#333333' }, sections: { header: { color: 'olive', background: { type: 'custom-color' } } } }), [], CDN, S3);
+    expect(bad.branding['header_color']).toBe('#333333');
+    expect(bad.warnings.some((w) => w.reason.includes('"olive"'))).toBe(true);
   });
 
   it('uses the dominant legacy button colour as the V3 primary, and says so', () => {

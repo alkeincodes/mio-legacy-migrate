@@ -21,6 +21,8 @@ export interface MapOptions {
   bundlePath: string;
   outDir: string;
   apiBase: string;
+  /** Legacy page types to leave out; undefined means the mapper's default list. */
+  excludePageTypes?: string[];
 }
 
 export async function runMap(options: MapOptions): Promise<string> {
@@ -28,11 +30,13 @@ export async function runMap(options: MapOptions): Promise<string> {
   const { catalog, digest } = await fetchCatalog(options.apiBase);
 
   const warnings: PlanWarning[] = [];
-  const { pages, accessRules, warnings: pageWarnings, renames } = mapPages(bundle);
+  const { pages, excluded, accessRules, warnings: pageWarnings, renames } = mapPages(bundle, { excludePageTypes: options.excludePageTypes });
   warnings.push(...pageWarnings);
 
   const slugByPageId = new Map(pages.map((p) => [p.legacyPageId, p.slug]));
-  const { navigation, warnings: navWarnings } = mapNavigation(bundle, slugByPageId, new Map(bundle.pages.map((pg) => [pg.id, pg.type])));
+  const { navigation, warnings: navWarnings } = mapNavigation(
+    bundle, slugByPageId, new Map(bundle.pages.map((pg) => [pg.id, pg.type])), new Set(excluded.map((e) => e.legacyPageId)),
+  );
   warnings.push(...navWarnings);
 
   const { branding, hubSettings, warnings: brandingWarnings } = mapBranding(
@@ -89,6 +93,7 @@ export async function runMap(options: MapOptions): Promise<string> {
     legacyHubDomain: bundle.header.legacyHubDomain,
     assetsPinned: bundle.header.manifestPinned !== false,
     pageSlugRenames: renames,
+    excludedPages: excluded,
     hub: {
       title: bundle.hub.title,
       slug: hubSlugFor(bundle.hub.custom_subdomain, bundle.header.legacyHubDomain, bundle.hub.id),
@@ -158,6 +163,7 @@ export async function runMap(options: MapOptions): Promise<string> {
   logger.info('plan written', {
     path,
     pages: plan.pages.length,
+    excludedPages: plan.excludedPages.length,
     assets: plan.assets.length,
     warnings: plan.warnings.length,
     dropped: plan.warnings.filter((w) => w.type === 'dropped').length,

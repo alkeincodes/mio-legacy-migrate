@@ -8,7 +8,7 @@ export const PLAN_VERSION = 1 as const;
 export interface PlanWarning {
   pageSlug: string | null;
   legacySectionId: number | null;
-  type: 'approximated' | 'dropped' | 'access-unmapped' | 'asset-pending';
+  type: 'approximated' | 'dropped' | 'access-unmapped' | 'asset-pending' | 'excluded';
   reason: string;
 }
 
@@ -87,6 +87,9 @@ export interface PlanSegment {
   unmappedReason: string | null;
 }
 
+/** A legacy page the migration leaves out because V3 serves that surface itself; links to it go to `route`. */
+export interface PlanExcludedPage { legacyPageId: number; title: string; legacyType: string; route: string }
+
 /** A team tag a segment condition names; created by slug before the segment. */
 export interface PlanTag { legacyTagId: number; name: string; slug: string }
 
@@ -127,10 +130,11 @@ export interface Plan {
   /** Legacy page slugs the mapper renamed (reserved on V3, or duplicates). */
   pageSlugRenames?: Array<{ legacySlug: string; slug: string; legacyPageId: number }>;
   hub: PlanHub;
-  branding: Record<string, string>;
+  branding: Record<string, string | boolean>;
   /** Hub settings apply merges over the target (theme mode); absent on older plans. */
   hubSettings?: Record<string, unknown>;
   pages: PlanPage[];
+  excludedPages: PlanExcludedPage[];
   playlists: PlanPlaylist[];
   folders: PlanFolder[];
   assets: PlanAsset[];

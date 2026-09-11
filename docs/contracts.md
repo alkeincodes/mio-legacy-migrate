@@ -88,6 +88,25 @@ header the route accepts, if any.
   its path; an off-site link is dropped with a run warning.
 - **The folder marker rides in the name** as ` [lgc:...]`, because folders
   have no free-text column. Adoption matches on that suffix.
+- **Legacy login, register, onboarding and discussions pages are not migrated**
+  (`DEFAULT_EXCLUDED_PAGE_TYPES`, `map --exclude-pages`). V3 serves each of
+  those surfaces at the built-in route of the same name, so the mapper records
+  each with an `excluded` warning, points links at the built-in route, drops
+  their menu items (the discussions item stays as V3's typed `discussions`
+  item), and the `removals` stage deletes a copy an earlier run created
+  (`DELETE .../pages/{id}`, 204; a 404 counts as gone) and marks the ledger
+  entry `removed` with the reason. Nothing else is ever deleted.
+- **The legacy homepage is the hub's built-in homepage** through the typed
+  descriptor (`PATCH .../hubs/{id}` `attributes.homepage: {kind: custom,
+  page_id}`, `app/hubs/schemas.py` HomepageCustom), written in the navigation
+  PATCH. The page itself stays (the descriptor needs a page to point at; its
+  slug is `home-page` because `home` is reserved), and `/<hub>` renders it.
+  Deleting that page would answer 409 `homepage_unset_would_orphan_hub`.
+- **The header takes the legacy theme's `sections.header`**: a `custom-color`
+  background maps its `color` to `header_color` and `accentColor` to
+  `header_accent`; without one the page background and text stand in. Legacy
+  `fonts.heading/body` are Google Fonts family names and go to
+  `font_heading`/`font_body` unchanged; `dark_mode` is sent as a boolean.
 - **Button icons are hub sprite ids** (`mio-hub/public/icons/sprite.svg`), and
   the legacy glyph set is larger. `BUTTON_ICONS` in `src/map/style.ts` maps
   same-glyph names directly and the rest to the nearest sprite (target to

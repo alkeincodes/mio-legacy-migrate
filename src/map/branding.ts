@@ -11,6 +11,8 @@ const COLLECTION_TO_KEY: Record<string, string> = {
   favicons: 'favicon_url',
 };
 
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
 function warn(reason: string): PlanWarning {
   return { pageSlug: null, legacySectionId: null, type: 'approximated', reason };
 }
@@ -21,8 +23,8 @@ export function mapBranding(
   cdnUrl: string,
   s3Url: string,
   opts: { dominantButton?: { background: string; text: string } | null } = {},
-): { branding: Record<string, string>; hubSettings: Record<string, unknown>; warnings: PlanWarning[] } {
-  const branding: Record<string, string> = {};
+): { branding: Record<string, string | boolean>; hubSettings: Record<string, unknown>; warnings: PlanWarning[] } {
+  const branding: Record<string, string | boolean> = {};
   const hubSettings: Record<string, unknown> = {};
   const warnings: PlanWarning[] = [];
 
@@ -33,14 +35,11 @@ export function mapBranding(
     if (Object.keys(settings).length === 0) {
       warnings.push(warn('hub_theme.settings is empty or not valid JSON; branding is left at V3 defaults'));
     }
+    // V3 takes a Google Fonts family name in font_heading/font_body and loads it
+    // at runtime (mio-hub src/lib/theme/font-fallback-stack.ts); legacy stores the same names.
     const fonts = settings['fonts'] as Record<string, unknown> | undefined;
-    if (fonts && (fonts['body'] || fonts['heading'])) {
-      warnings.push(
-        warn(
-          `legacy theme names fonts (body ${String(fonts['body'] ?? 'default')}, heading ${String(fonts['heading'] ?? 'default')}); V3 branding has no documented font key, so the V3 default typeface is used`,
-        ),
-      );
-    }
+    if (typeof fonts?.['heading'] === 'string' && fonts['heading'].trim()) branding['font_heading'] = fonts['heading'].trim();
+    if (typeof fonts?.['body'] === 'string' && fonts['body'].trim()) branding['font_body'] = fonts['body'].trim();
 
     const colours = (settings['colors'] ?? {}) as Record<string, unknown>;
     for (const [legacyKey, v3Key] of [
@@ -61,7 +60,8 @@ export function mapBranding(
         );
       }
     }
-    if (settings['darkMode'] === true) branding['dark_mode'] = 'true';
+    // The hub types dark_mode as a boolean (mio-hub src/lib/theme/types.ts).
+    if (settings['darkMode'] === true) branding['dark_mode'] = true;
 
     // V3 lets the viewer pick light or dark unless the hub forces `custom`, which
     // is the only mode where branding.background and branding.text apply. A legacy
@@ -73,6 +73,21 @@ export function mapBranding(
       if (branding['text']) branding['header_accent'] = branding['text'];
     }
 
+    // Legacy theme `sections.header` paints the top bar: a custom-color background
+    // with its own colour, and accentColor for the nav text. Those beat the page colours.
+    const header = ((settings['sections'] as Record<string, unknown> | undefined)?.['header'] ?? {}) as Record<string, unknown>;
+    const headerBackground = (header['background'] as Record<string, unknown> | undefined)?.['type'];
+    const headerColour = header['color'];
+    if (headerBackground === 'custom-color' && typeof headerColour === 'string') {
+      if (HEX6.test(headerColour)) branding['header_color'] = headerColour;
+      else warnings.push(warn(`legacy header colour is "${headerColour}", not a 6-digit hex; the page background stands in`));
+    }
+    const accent = header['accentColor'];
+    if (typeof accent === 'string') {
+      if (HEX6.test(accent)) branding['header_accent'] = accent;
+      else warnings.push(warn(`legacy header accent is "${accent}", not a 6-digit hex; the page text colour stands in`));
+    }
+
     // Legacy buttons carry their own colours; V3 buttons take the hub primary. When
     // the hub's buttons agree on one colour, that is what members see as primary.
     if (opts.dominantButton) {
@@ -80,7 +95,7 @@ export function mapBranding(
       branding['primary'] = opts.dominantButton.background;
       warnings.push(
         warn(
-          `V3 primary set to ${opts.dominantButton.background}, the colour most legacy buttons carry; the legacy theme primary ${legacyPrimary ?? '(unset)'} is not a button colour on this hub`,
+          `V3 primary set to ${opts.dominantButton.background}, the colour most legacy buttons carry; the legacy theme primary ${String(legacyPrimary ?? '(unset)')} is not a button colour on this hub`,
         ),
       );
     }

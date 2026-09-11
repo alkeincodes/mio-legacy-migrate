@@ -92,4 +92,17 @@ describe('the legacy discussions page in the menu', () => {
     const { navigation } = mapNavigation(bundle([item({ title: 'COMMUNITY', model_id: 100 })]), slugs, new Map([[100, 'discussions']]));
     expect(navigation.header[0]).toEqual({ type: 'discussions', label: 'COMMUNITY', position: 0 });
   });
+
+  it('drops a menu item that points at an excluded page, with an excluded warning, but keeps the typed discussions item', () => {
+    const excluded = new Set([100, 101]);
+    const { navigation, warnings } = mapNavigation(
+      bundle([item({ id: 1, title: 'LOGIN', model_id: 100 }), item({ id: 2, title: 'COMMUNITY', model_id: 101 }), item({ id: 3, title: 'ABOUT', model_id: 102 })]),
+      new Map([[102, 'about']]), new Map([[100, 'login'], [101, 'discussions']]), excluded,
+    );
+    expect(navigation.header).toEqual([
+      { type: 'discussions', label: 'COMMUNITY', position: 0 },
+      { type: 'page', label: 'ABOUT', pageSlugRef: 'about', position: 1 },
+    ]);
+    expect(warnings).toEqual([expect.objectContaining({ type: 'excluded', reason: expect.stringContaining('"LOGIN"') })]);
+  });
 });

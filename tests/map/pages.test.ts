@@ -93,12 +93,54 @@ describe('mapPages renames', () => {
       pages: [page({ id: 1, slug: 'onboarding' }), page({ id: 2, slug: 'about' }), page({ id: 3, slug: null, title: 'Login' })],
       sections: [], media: [], segmentables: [], segments: [], assets: [],
     } as unknown as Parameters<typeof mapPages>[0];
-    const { renames, pages } = mapPages(bundle);
+    const { renames, pages } = mapPages(bundle, { excludePageTypes: [] });
     expect(renames).toEqual([
       { legacySlug: 'login', slug: 'login-page', legacyPageId: 3 },
       { legacySlug: 'onboarding', slug: 'onboarding-page', legacyPageId: 1 },
     ]);
     expect(pages.map((p) => p.slug)).toEqual(['login-page', 'about', 'onboarding-page']);
+  });
+});
+
+describe('excluded page types', () => {
+  const button = (id: number, pageId: number, modelId: number) => ({ id, hub_id: 7, page_id: null, parent_id: id - 1, model_type: 'App\\Page', model_id: modelId, hidden: 0, type: 'button', title: null, label: 'Button', settings: JSON.stringify({ type: 'page', link: { label: 'Go' } }), permissions: null, meta: null, position: 0, segment_id: null });
+  const wrap = (row: number, pageId: number) => [
+    { id: row, hub_id: 7, page_id: pageId, parent_id: null, model_type: null, model_id: null, hidden: 0, type: 'row', title: null, label: null, settings: '{}', permissions: null, meta: null, position: 0, segment_id: null },
+    { id: row + 1, hub_id: 7, page_id: null, parent_id: row, model_type: null, model_id: null, hidden: 0, type: 'column', title: null, label: null, settings: '{}', permissions: null, meta: null, position: 0, segment_id: null },
+  ];
+
+  it('leaves out login, register, onboarding and discussions by default, records each with a warning, and routes links to the built-in surface', async () => {
+    const { mapPages } = await import('../../src/map/pages.js');
+    const bundle = {
+      header: { legacyHubId: 7, legacyHubDomain: 'x.example.com' }, hub: { id: 7, auth: 1 },
+      pages: [
+        page({ id: 1, slug: null, title: 'Login', type: 'login' }), page({ id: 2, slug: 'signup', title: 'Register', type: 'register' }),
+        page({ id: 3, slug: null, title: 'Onboarding', type: 'onboarding' }), page({ id: 4, slug: null, title: 'Discussions', type: 'discussions' }),
+        page({ id: 5, slug: 'about' }),
+      ],
+      sections: [...wrap(10, 5), button(12, 5, 2)],
+      media: [], segmentables: [], segments: [], assets: [],
+    } as unknown as Parameters<typeof mapPages>[0];
+    const { pages, excluded, warnings, renames } = mapPages(bundle);
+    expect(pages.map((p) => p.slug)).toEqual(['about']);
+    expect(excluded.map((e) => `${e.legacyPageId}:${e.legacyType}->/${e.route}`)).toEqual(['1:login->/login', '2:register->/register', '3:onboarding->/onboarding', '4:discussions->/discussions']);
+    expect(warnings.filter((w) => w.type === 'excluded')).toHaveLength(4);
+    expect(renames).toEqual([]);
+    const walk = (n: { children?: unknown[] }): unknown[] => [n, ...((n.children ?? []) as never[]).flatMap(walk)];
+    const btn = walk(pages[0]!.tree).find((n) => (n as { kind?: string }).kind === 'button') as { settings: { action: unknown } };
+    expect(btn.settings.action).toEqual({ type: 'page', value: '/register' });
+  });
+
+  it('honours a narrower exclusion list', async () => {
+    const { mapPages } = await import('../../src/map/pages.js');
+    const bundle = {
+      header: { legacyHubId: 7, legacyHubDomain: 'x.example.com' }, hub: { id: 7, auth: 1 },
+      pages: [page({ id: 1, slug: null, title: 'Login', type: 'login' }), page({ id: 4, slug: null, title: 'Discussions', type: 'discussions' })],
+      sections: [], media: [], segmentables: [], segments: [], assets: [],
+    } as unknown as Parameters<typeof mapPages>[0];
+    const { pages, excluded } = mapPages(bundle, { excludePageTypes: ['login'] });
+    expect(pages.map((p) => p.slug)).toEqual(['discussions-page']);
+    expect(excluded.map((e) => e.legacyPageId)).toEqual([1]);
   });
 });
 
