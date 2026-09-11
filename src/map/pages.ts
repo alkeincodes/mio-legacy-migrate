@@ -13,9 +13,7 @@ import { resolveGate } from './visibility.js';
  * Everything else must match ^[a-z0-9][a-z0-9_-]*$.
  */
 const RESERVED_SLUGS = new Set([
-  'login', 'sign-in', 'home', 'payment', 'payments', 'content', 'legal', 'playlists', 'account',
-  'history', 'messages', 'moderation', 'my-list', 'notifications', 'forgot', 'forgot-password',
-  'register', 'reset-password', 'onboarding', 'members',
+  'access-denied', 'account', 'align', 'banned', 'discussions', 'editor-fixture', 'forgot', 'forgot-password', 'history', 'home', 'legal', 'login', 'members', 'messages', 'moderation', 'my-list', 'notifications', 'onboarding', 'payment', 'playlists', 'register', 'reset-password', 'search',
 ]);
 
 export function slugFor(page: LegacyPage, taken: Set<string>): string {

@@ -76,9 +76,6 @@ header the route accepts, if any.
   (`require_jsonapi_content_type`); the client sends it on every write.
 - **Reserved page slugs.** `POST .../pages/` answers 422 `page_slug_reserved`
   for a slug that collides with a built-in route
-  (`app/pages/service.py` `RESERVED_SLUGS`): login, sign-in, home, payment,
-  payments, content, legal, playlists, account, history, messages, moderation,
-  my-list, notifications, forgot, forgot-password, register, reset-password,
-  onboarding, members. The mapper appends `-page` to any of these, records the
+  (`app/pages/service.py` `RESERVED_SLUGS`, 23 entries): access-denied, account, align, banned, discussions, editor-fixture, forgot, forgot-password, history, home, legal, login, members, messages, moderation, my-list, notifications, onboarding, payment, playlists, register, reset-password, search. The mapper appends `-page` to any of these, records the
   rename in the plan, rewrites internal links to the new slug, and the verify
   report lists every rename.

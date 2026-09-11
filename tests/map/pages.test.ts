@@ -30,9 +30,7 @@ describe('slugFor', () => {
   });
 
   it.each([
-    'login', 'sign-in', 'home', 'payment', 'payments', 'content', 'legal', 'playlists', 'account',
-    'history', 'messages', 'moderation', 'my-list', 'notifications', 'forgot', 'forgot-password',
-    'register', 'reset-password', 'onboarding', 'members',
+    'access-denied', 'account', 'align', 'banned', 'discussions', 'editor-fixture', 'forgot', 'forgot-password', 'history', 'home', 'legal', 'login', 'members', 'messages', 'moderation', 'my-list', 'notifications', 'onboarding', 'payment', 'playlists', 'register', 'reset-password', 'search',
   ])('renames the reserved slug "%s", which the backend 422s as page_slug_reserved', (reserved) => {
     expect(slugFor(page({ slug: reserved }), new Set())).toBe(`${reserved}-page`);
   });
