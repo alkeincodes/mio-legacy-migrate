@@ -1,7 +1,7 @@
 import { loadEnv, apiKeyForProfile, secretsOf } from '../config/env.js';
 import { loadProfile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
-import { readPlan } from '../map/plan.js';
+import { contentHash, readPlan } from '../map/plan.js';
 import { LedgerStore, ledgerDir } from '../ledger/store.js';
 import { Budget, budgetIdentity } from '../apply/budget.js';
 import { ApiClient } from '../apply/api.js';
@@ -37,11 +37,12 @@ export async function runVerify(opts: {
     const tree = await api.get<{ data: { attributes: { tree: unknown } } }>(
       `/api/v1/teams/${profile.teamId}/hubs/${hubId}/pages/${row.attributes.slug}?resolve=false`,
     );
-    const sections = (tree.body.data.attributes.tree as { children?: unknown[] } | null)?.children ?? [];
+    const publishedTree = tree.body.data.attributes.tree as { children?: unknown[] } | null;
+    const sections = publishedTree?.children ?? [];
     livePages.push({
       slug: row.attributes.slug,
       sectionCount: sections.length,
-      publishedTreeDigest: null,
+      publishedTreeDigest: publishedTree === null ? null : contentHash(publishedTree),
     });
   }
 

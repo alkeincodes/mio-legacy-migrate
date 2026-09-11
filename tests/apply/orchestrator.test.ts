@@ -7,7 +7,7 @@ describe('runApply, scope guards', () => {
       runApply({
         planPath: 'plans/x.json', profileName: 'test', mode: 'upsert', dryRun: true,
         resumeRunId: null, checkAccess: false, assetsOnly: false, breakLock: false,
-        allowCatalogDrift: false,
+        allowCatalogDrift: false, cleanupOrphans: false, confirm: false,
       }),
     ).rejects.toThrow('--mode upsert is M3; only --mode fresh is implemented');
   });
@@ -17,7 +17,7 @@ describe('runApply, scope guards', () => {
       runApply({
         planPath: 'plans/x.json', profileName: 'test', mode: 'fresh', dryRun: true,
         resumeRunId: null, checkAccess: false, assetsOnly: true, breakLock: false,
-        allowCatalogDrift: false,
+        allowCatalogDrift: false, cleanupOrphans: false, confirm: false,
       }),
     ).rejects.toThrow('--assets-only requires the backend import endpoint (spec section 9); not available in M1');
   });

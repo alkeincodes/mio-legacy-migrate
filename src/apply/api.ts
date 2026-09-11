@@ -138,6 +138,10 @@ export class ApiClient {
     return { body: result.body as T, etag: result.etag };
   }
 
+  async delete(path: string): Promise<void> {
+    await this.send('DELETE', path, undefined, {}, undefined, true);
+  }
+
   /**
    * Pages a collection to the end. No list endpoint this tool uses has a filter
    * or search parameter, so a marker lookup must read every page and filter

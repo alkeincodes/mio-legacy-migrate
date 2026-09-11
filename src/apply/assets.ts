@@ -156,3 +156,46 @@ export async function runAssetStage(opts: {
     );
   }
 }
+/**
+ * An allocated-but-never-verified synthetic row is referenced by no page or
+ * playlist, so it is unreachable by members. It still costs storage and clutters
+ * every marker scan, so it is worth deleting once no run could still be working
+ * on it. `copied` is deliberately excluded: verification may simply not have run.
+ */
+export function findOrphans(
+  store: LedgerStore,
+  olderThanMs: number,
+  now = new Date(),
+): LedgerEntry[] {
+  const cutoff = now.getTime() - olderThanMs;
+  return store
+    .all()
+    .filter((entry) => entry.kind === 'asset' && entry.state === 'allocated')
+    .filter((entry) => Date.parse(entry.updatedAt) < cutoff);
+}
+
+export async function deleteOrphans(
+  store: LedgerStore,
+  orphans: LedgerEntry[],
+  deleteFile: (fileId: string) => Promise<void>,
+): Promise<number> {
+  let deleted = 0;
+  for (const orphan of orphans) {
+    if (!orphan.v3Id) continue;
+    await deleteFile(orphan.v3Id);
+    store.upsert({
+      ...orphan,
+      v3Id: null,
+      state: 'intent',
+      updatedAt: new Date().toISOString(),
+      asset: orphan.asset
+        ? { ...orphan.asset, v3FileId: null, v3MediaId: null, destinationKey: null }
+        : null,
+    });
+    deleted += 1;
+    logger.info('deleted an allocated-but-unverified asset', {
+      marker: orphan.marker, fileId: orphan.v3Id,
+    });
+  }
+  return deleted;
+}

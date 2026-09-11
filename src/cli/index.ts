@@ -47,9 +47,12 @@ program
   .option('--assets-only', 'M2 only: import pending video and rewrite references', false)
   .option('--break-lock', 'clear a stale lock after printing its owner', false)
   .option('--allow-catalog-drift', 'apply a plan mapped against a different catalog version', false)
+  .option('--cleanup-orphans', 'list allocated-but-unverified asset rows older than a day', false)
+  .option('--confirm', 'with --cleanup-orphans, actually delete them', false)
   .action(async (opts: {
     profile: string; plan: string; mode: string; dryRun: boolean; resume?: string;
     checkAccess: boolean; assetsOnly: boolean; breakLock: boolean; allowCatalogDrift: boolean;
+    cleanupOrphans: boolean; confirm: boolean;
   }) => {
     await runApply({
       planPath: opts.plan,
@@ -61,6 +64,8 @@ program
       assetsOnly: opts.assetsOnly,
       breakLock: opts.breakLock,
       allowCatalogDrift: opts.allowCatalogDrift,
+      cleanupOrphans: opts.cleanupOrphans,
+      confirm: opts.confirm,
     });
   });
 

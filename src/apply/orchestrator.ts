@@ -16,7 +16,8 @@ import { LedgerStore, ledgerDir } from '../ledger/store.js';
 import { Lock, assertLedgerClean, HEARTBEAT_INTERVAL_MS } from '../ledger/lock.js';
 import { recordMarker } from '../ledger/marker.js';
 import { adoptOrCreate } from './inflight.js';
-import { runAssetStage, type AssetRunner } from './assets.js';
+import { deleteOrphans, findOrphans, runAssetStage, type AssetRunner } from './assets.js';
+import { checkAccess } from './checkAccess.js';
 import { type S3Ops } from './s3.js';
 import { playbackPrefilter, writePlaybackReport, type PlaybackResult } from './playbackPrefilter.js';
 import { APPLY_ORDER, resolveRefs, shouldPublish } from './order.js';
@@ -32,6 +33,8 @@ export interface ApplyOptions {
   assetsOnly: boolean;
   breakLock: boolean;
   allowCatalogDrift: boolean;
+  cleanupOrphans: boolean;
+  confirm: boolean;
 }
 
 /** Every entity kind apply may touch, checked against docs/contracts.md at startup. */
@@ -90,16 +93,6 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     return runId;
   }
 
-  assertLedgerClean(dir);
-  await preflight({ profile, apiKey, cli, api });
-
-  const store = options.resumeRunId
-    ? LedgerStore.openForResume(dir, runId, header)
-    : LedgerStore.create(dir, header);
-
-  const lock = Lock.acquire(dir, runId, { breakLock: options.breakLock });
-  const heartbeat = setInterval(() => lock.heartbeat(), HEARTBEAT_INTERVAL_MS);
-
   const s3Client = new S3Client({
     region: profile.region,
     credentials: { accessKeyId: env.awsAccessKeyId, secretAccessKey: env.awsSecretAccessKey },
@@ -141,6 +134,43 @@ export async function runApply(options: ApplyOptions): Promise<string> {
       await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
     },
   };
+
+  if (options.checkAccess) {
+    const probe = [...plan.assets]
+      .filter((a) => !a.isVideo)
+      .sort((a, b) => a.sizeBytes - b.sizeBytes)[0];
+    if (!probe) throw new Error('the plan has no non-video asset to use as a copy probe');
+    await checkAccess({ probe, s3, api, teamId: profile.teamId, bucket: profile.bucket });
+    logger.info('apply --check-access passed; no mutation was attempted');
+    return runId;
+  }
+
+  if (options.cleanupOrphans) {
+    const store = LedgerStore.open(dir, options.resumeRunId ?? runId);
+    const orphans = findOrphans(store, 24 * 60 * 60 * 1000);
+    if (!options.confirm) {
+      logger.info('cleanup-orphans would delete these allocated-but-unverified rows; rerun with --confirm', {
+        count: orphans.length,
+        markers: orphans.map((o) => o.marker),
+      });
+      return runId;
+    }
+    const deleted = await deleteOrphans(store, orphans, async (fileId) => {
+      await api.delete(`/api/v1/teams/${profile.teamId}/files/${fileId}`);
+    });
+    logger.info('cleanup-orphans finished', { deleted });
+    return runId;
+  }
+
+  assertLedgerClean(dir);
+  await preflight({ profile, apiKey, cli, api });
+
+  const store = options.resumeRunId
+    ? LedgerStore.openForResume(dir, runId, header)
+    : LedgerStore.create(dir, header);
+
+  const lock = Lock.acquire(dir, runId, { breakLock: options.breakLock });
+  const heartbeat = setInterval(() => lock.heartbeat(), HEARTBEAT_INTERVAL_MS);
 
   const assetRunner: AssetRunner = {
     async register(asset, marker) {
