@@ -86,12 +86,27 @@ export function evaluatePlayback(slug: string, url: string, probe: BrowserPagePr
   return { ...base, ok: true, reason: null };
 }
 
+/**
+ * Logs in through the site's own form (for V3 that is the hub member login at
+ * <hub>/login, not the platform login) and refuses to continue while still on
+ * a login page, so a wrong identity fails here instead of producing a sheet of
+ * login walls.
+ */
 async function login(page: Page, url: string, email: string, password: string): Promise<void> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-  await page.fill('input[type="email"], input[name="email"]', email);
-  await page.fill('input[type="password"], input[name="password"]', password);
-  await page.click('button[type="submit"]');
+  const passwordField = page.locator('input[type="password"], input[name="password"]').first();
+  if ((await passwordField.count()) === 0) {
+    throw new Error(`${url} offers no password field (magic-link only?); cannot log in unattended`);
+  }
+  await page.locator('input[type="email"], input[name="email"]').first().fill(email);
+  await passwordField.fill(password);
+  await page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")').first().click();
   await page.waitForLoadState('networkidle', { timeout: 60_000 });
+  await page.waitForTimeout(1_500);
+  if (/\/login(\?|$)/.test(page.url()) || (await passwordField.count()) > 0) {
+    throw new Error(`login as ${email} at ${url} did not leave the login page (still at ${page.url()}); is that identity a member of this hub?`);
+  }
+  logger.info('logged in', { url, as: email });
 }
 
 export async function captureContactSheet(opts: {

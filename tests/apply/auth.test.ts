@@ -31,7 +31,7 @@ describe('resolveApiAuth', () => {
   it('fails clearly when neither a key nor a login is configured', async () => {
     await expect(
       resolveApiAuth(profile, { v3VerifyLoginEmail: 'unset', v3VerifyLoginPassword: 'unset' }, vi.fn() as unknown as typeof fetch),
-    ).rejects.toThrow(/V3_VERIFY_LOGIN_EMAIL is empty/);
+    ).rejects.toThrow(/neither V3_PLATFORM_LOGIN_EMAIL nor V3_VERIFY_LOGIN_EMAIL/);
   });
 
   it('surfaces a refused login with its status', async () => {

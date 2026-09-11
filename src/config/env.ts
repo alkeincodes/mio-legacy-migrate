@@ -23,6 +23,8 @@ const EnvSchema = z.object({
   LEGACY_HUB_LOGIN_PASSWORD: z.string().min(1),
   V3_VERIFY_LOGIN_EMAIL: z.string().min(1),
   V3_VERIFY_LOGIN_PASSWORD: z.string().min(1),
+  V3_PLATFORM_LOGIN_EMAIL: z.string().default(''),
+  V3_PLATFORM_LOGIN_PASSWORD: z.string().default(''),
 });
 
 export interface Env {
@@ -47,6 +49,9 @@ export interface Env {
   legacyHubLoginPassword: string;
   v3VerifyLoginEmail: string;
   v3VerifyLoginPassword: string;
+  /** A platform (team) user for the API when no static key is set; verify's hub member cannot use the platform login. */
+  v3PlatformLoginEmail: string;
+  v3PlatformLoginPassword: string;
 }
 
 export type EnvGroup = 's3' | 'cdn' | 'logins';
@@ -62,6 +67,8 @@ const ALWAYS_KEYS = [
   'SSH_BOX_HOST', 'SSH_BOX_USER', 'SSH_KNOWN_HOSTS_FILE',
 ];
 const PLACEHOLDERS: Record<string, string> = {
+  V3_PLATFORM_LOGIN_EMAIL: '',
+  V3_PLATFORM_LOGIN_PASSWORD: '',
   V3_AWS_ACCESS_KEY_ID: '',
   V3_AWS_SECRET_ACCESS_KEY: '',
   AWS_REGION: 'us-east-1',
@@ -143,6 +150,8 @@ export function loadEnv(
     legacyHubLoginPassword: e.LEGACY_HUB_LOGIN_PASSWORD,
     v3VerifyLoginEmail: e.V3_VERIFY_LOGIN_EMAIL,
     v3VerifyLoginPassword: e.V3_VERIFY_LOGIN_PASSWORD,
+    v3PlatformLoginEmail: e.V3_PLATFORM_LOGIN_EMAIL,
+    v3PlatformLoginPassword: e.V3_PLATFORM_LOGIN_PASSWORD,
   };
 }
 
@@ -174,6 +183,7 @@ export function secretsOf(env: Env): string[] {
     env.v3AwsAccessKeyId,
     env.legacyHubLoginPassword,
     env.v3VerifyLoginPassword,
+    env.v3PlatformLoginPassword,
     ...Object.entries(process.env)
       .filter(([k]) => k.startsWith('V3_API_KEY_'))
       .map(([, v]) => v ?? ''),
