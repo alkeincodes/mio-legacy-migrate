@@ -95,6 +95,8 @@ export function evaluatePlayback(slug: string, url: string, probe: BrowserPagePr
 async function login(page: Page, url: string, email: string, password: string): Promise<void> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   const passwordField = page.locator('input[type="password"], input[name="password"]').first();
+  // Both sites render the form client-side; give it a moment before calling it magic-link only.
+  await passwordField.waitFor({ state: 'visible', timeout: 20_000 }).catch(() => undefined);
   if ((await passwordField.count()) === 0) {
     throw new Error(`${url} offers no password field (magic-link only?); cannot log in unattended`);
   }
