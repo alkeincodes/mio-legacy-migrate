@@ -102,7 +102,11 @@ async function login(page: Page, url: string, email: string, password: string): 
   }
   await page.locator('input[type="email"], input[name="email"]').first().fill(email);
   await passwordField.fill(password);
-  await page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")').first().click();
+  // The hub also offers "Sign in using Magic Link" ahead of the real button, so
+  // prefer the submit button and fall back to an exact label only.
+  const submit = page.locator('button[type="submit"]');
+  if ((await submit.count()) > 0) await submit.first().click();
+  else await page.locator('button:text-is("Sign in"), button:text-is("Log in"), button:text-is("Login")').first().click();
   // The hub sets its session then navigates client-side; wait for the URL to leave /login.
   try {
     await page.waitForURL((u) => !/\/login(\?|$)/.test(u.toString()), { timeout: 30_000 });
