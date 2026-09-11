@@ -144,3 +144,27 @@ published-ungated.json, apply-warnings.json.
 
 Next: a hub member identity for verify; `apply --assets-only --resume <run>`
 once the V3 AWS pair is in .env; then re-verify.
+
+## 2026-09-12, content fixes after the first verified render
+
+The first contact sheet with a hub member login showed placeholder words
+("Headline", "Paragraph", "Button") on every page. On the real hub the
+`label` column is the element's display name; the text is TipTap JSON in
+`title` (headline), `settings.value` (paragraph) and `settings.link.url`
+(links), the button label is `settings.link.label`, and a button's or card's
+page/playlist/file target is the row's `model_type`/`model_id`. `src/map/tiptap.ts`
+converts documents; the V3 text node shows HTML literally, so paragraphs are
+plain text and formatting loss is an approximated warning.
+
+Also from the render: an image element that links a video File shows its
+thumbnail conversion, not the video; file cards must reference the asset (a
+legacy file id sent as a V3 content id 404s); links to reserved built-in
+routes (discussions, login, ...) stay on the built-in route; the caption
+check ignores disabled, src-less tracks.
+
+Re-applying corrected trees needs `--accept-plan-change --rewrite-pages`
+(page trees may differ; everything else must still hash the same). Each
+rewrite republishes up to 31 pages against the 60/hour publish limit, so
+consecutive rewrites wait for the window. The verify user must be a HUB
+MEMBER (`V3_VERIFY_LOGIN_*`); the API keeps a platform user
+(`V3_PLATFORM_LOGIN_*`).
