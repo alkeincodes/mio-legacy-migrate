@@ -74,3 +74,11 @@ header the route accepts, if any.
   have no free-text column. Adoption matches on that suffix.
 - **Achievements and segments require `Content-Type: application/vnd.api+json`**
   (`require_jsonapi_content_type`); the client sends it on every write.
+- **Reserved page slugs.** `POST .../pages/` answers 422 `page_slug_reserved`
+  for a slug that collides with a built-in route
+  (`app/pages/service.py` `RESERVED_SLUGS`): login, sign-in, home, payment,
+  payments, content, legal, playlists, account, history, messages, moderation,
+  my-list, notifications, forgot, forgot-password, register, reset-password,
+  onboarding, members. The mapper appends `-page` to any of these, records the
+  rename in the plan, rewrites internal links to the new slug, and the verify
+  report lists every rename.

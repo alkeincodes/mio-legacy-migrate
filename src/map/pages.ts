@@ -70,6 +70,7 @@ export function mapPages(bundle: Bundle): {
   pages: PlanPage[];
   accessRules: PlanAccessRule[];
   warnings: PlanWarning[];
+  renames: Array<{ legacySlug: string; slug: string; legacyPageId: number }>;
 } {
   const warnings: PlanWarning[] = [];
   const accessRules: PlanAccessRule[] = [];
@@ -99,8 +100,22 @@ export function mapPages(bundle: Bundle): {
   const ordered = [...bundle.pages].sort((a, b) => (a.slug ?? '') < (b.slug ?? '') ? -1 : 1);
   const pages: PlanPage[] = [];
 
+  // Assign every slug first so a link to a renamed page can resolve while its tree is mapped.
+  const slugByPage = new Map<number, string>();
+  const slugByLegacySlug = new Map<string, string>();
+  const renames: Array<{ legacySlug: string; slug: string; legacyPageId: number }> = [];
   for (const page of ordered) {
     const slug = slugFor(page, taken);
+    slugByPage.set(page.id, slug);
+    if (page.slug) {
+      slugByLegacySlug.set(page.slug, slug);
+      if (page.slug !== slug) renames.push({ legacySlug: page.slug, slug, legacyPageId: page.id });
+    }
+  }
+  const resolvePageSlug = (legacySlug: string): string => slugByLegacySlug.get(legacySlug) ?? legacySlug;
+
+  for (const page of ordered) {
+    const slug = slugByPage.get(page.id) ?? slugFor(page, taken);
     const restrictedSectionNodeIds: string[] = [];
 
     const ctx: MapContext = {
@@ -109,6 +124,7 @@ export function mapPages(bundle: Bundle): {
       pageSlug: slug,
       childrenOf: (id) => (sectionsByParent.get(id) ?? []).slice().sort(byPosition),
       warn: (w) => warnings.push(w),
+      resolvePageSlug,
       mapElement: (section, ordinal) =>
         mapElement(section, ordinal, {
           legacyHubId: bundle.header.legacyHubId,
@@ -120,6 +136,7 @@ export function mapPages(bundle: Bundle): {
             `http://${bundle.header.legacyHubDomain}`,
           ],
           assetForUrl: (url) => assetByUrl.get(url) ?? null,
+          resolvePageSlug,
           mediaIdForSection: (s) =>
             s.model_type === MORPH_FILE && s.model_id !== null
               ? mediaByFileId.get(s.model_id) ?? null
@@ -167,5 +184,5 @@ export function mapPages(bundle: Bundle): {
     });
   }
 
-  return { pages, accessRules, warnings };
+  return { pages, accessRules, warnings, renames };
 }

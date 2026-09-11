@@ -23,7 +23,7 @@ import { principalsFromEnv, s3OpsFor } from './s3Clients.js';
 import { playbackPrefilter, writePlaybackReport, type PlaybackResult } from './playbackPrefilter.js';
 import { APPLY_ORDER, shouldPublish } from './order.js';
 import {
-  accessRulesStage, achievementsStage, assetReferences, attachFoldersStage, brandingStage, foldersStage, hubStage, legacySegmentsGating,
+  accessRulesStage, achievementsStage, assetReferences, attachFoldersStage, brandingStage, doneEntriesDiffering, foldersStage, hubStage, legacySegmentsGating,
   navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, segmentsStage, spacesStage,
   type StageContext,
 } from './stages.js';
@@ -222,6 +222,23 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     : [];
   let mappedRuleTargets = new Set<string>();
   const references = assetReferences(plan);
+
+  if (options.resumeRunId && store.header.planHash !== header.planHash) {
+    // --accept-plan-change: every entry already done must hash identically under the new plan.
+    const differing = doneEntriesDiffering(ctx);
+    if (differing.length > 0) {
+      lock.release();
+      clearInterval(heartbeat);
+      throw new Error(
+        `refusing --accept-plan-change: ${differing.length} done entr${differing.length === 1 ? 'y' : 'ies'} would differ under the new plan, which would leave the hub on two plans: ${differing.map((d) => `${d.kind} ${d.legacyId} (${d.field})`).join(', ')}`,
+      );
+    }
+    logger.warn('resuming with a changed plan; every done entry hashes identically under it', {
+      previousPlanHash: store.header.planHash,
+      planHash: header.planHash,
+    });
+    store.acceptPlanChange(header.planHash);
+  }
   // --assets-only copies, then rewrites what points at the copies: folders, playlist items, page trees.
   const stages = options.assetsOnly
     ? APPLY_ORDER.filter((stage) => stage === 'assets' || stage === 'playlists' || stage === 'pageTrees')

@@ -111,6 +111,8 @@ export interface Plan {
   legacyHubDomain?: string;
   /** False when the bundle came from `extract --skip-s3`; apply refuses a real run until it is pinned. */
   assetsPinned?: boolean;
+  /** Legacy page slugs the mapper renamed (reserved on V3, or duplicates). */
+  pageSlugRenames?: Array<{ legacySlug: string; slug: string; legacyPageId: number }>;
   hub: PlanHub;
   branding: Record<string, string>;
   pages: PlanPage[];

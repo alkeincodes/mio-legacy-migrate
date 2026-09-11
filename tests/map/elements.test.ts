@@ -149,3 +149,12 @@ describe('image stored as settings.thumbnail.url', () => {
     expect(warnings[0]?.reason).toContain('not in the asset manifest');
   });
 });
+
+describe('links to renamed pages', () => {
+  it('rewrites a same-origin link to a reserved slug onto the renamed slug', () => {
+    const section = fixture('button');
+    section.settings = JSON.stringify({ link: { url: 'https://alliance.mantalks.com/onboarding' } });
+    const node = mapElement(section, 6, { ...ctx(), resolvePageSlug: (s) => (s === 'onboarding' ? 'onboarding-page' : s) });
+    expect(node?.settings?.['action']).toEqual({ type: 'page', value: '/onboarding-page' });
+  });
+});

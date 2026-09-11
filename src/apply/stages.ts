@@ -598,3 +598,43 @@ export async function achievementsStage(ctx: StageContext): Promise<void> {
     if (entry) ctx.store.upsert({ ...entry, referenceHash: ctx.hubId, updatedAt: new Date().toISOString() });
   }
 }
+
+/**
+ * What every ledger entry's hashes would be under the current plan, for the
+ * kinds the run creates by marker. --accept-plan-change refuses if any entry
+ * already done differs, so a run never ends up half on one plan.
+ */
+export function expectedHashesFor(ctx: StageContext): Map<string, { contentHash: string; referenceHash: string | null | undefined }> {
+  const out = new Map<string, { contentHash: string; referenceHash: string | null | undefined }>();
+  const m = (legacyId: number): string => recordMarker(ctx.plan.sourceHost, legacyId, ctx.runId);
+  out.set(m(ctx.plan.legacyHubId), { contentHash: contentHash(ctx.plan.hub), referenceHash: undefined });
+  for (const f of ctx.plan.folders) out.set(m(f.legacyFolderId), { contentHash: contentHash(f), referenceHash: undefined });
+  for (const p of ctx.plan.playlists) out.set(m(p.legacyPlaylistId), { contentHash: contentHash(p), referenceHash: undefined });
+  for (const sp of ctx.plan.spaces) out.set(m(sp.legacyCategoryId), { contentHash: contentHash(sp), referenceHash: undefined });
+  for (const a of ctx.plan.achievements) out.set(m(a.legacyAchievementId), { contentHash: contentHash(a), referenceHash: undefined });
+  const resolver = refResolverFor(ctx);
+  for (const page of ctx.plan.pages) {
+    const entry = ctx.store.find(m(page.legacyPageId));
+    // A draft-only entry carries the plan tree hash; a written tree carries the resolved tree hash.
+    const written = entry?.referenceHash !== null && entry?.referenceHash !== undefined;
+    out.set(m(page.legacyPageId), {
+      contentHash: written ? contentHash(resolveRefs(page.tree, resolver)) : contentHash(page.tree),
+      referenceHash: undefined,
+    });
+  }
+  return out;
+}
+
+/** Done entries whose hashes the current plan would not reproduce. */
+export function doneEntriesDiffering(ctx: StageContext): Array<{ marker: string; kind: string; legacyId: number; field: 'contentHash' | 'referenceHash' }> {
+  const expected = expectedHashesFor(ctx);
+  const differing: Array<{ marker: string; kind: string; legacyId: number; field: 'contentHash' | 'referenceHash' }> = [];
+  for (const entry of ctx.store.all()) {
+    if (entry.state !== 'done') continue;
+    const want = expected.get(entry.marker);
+    if (!want) continue;
+    if (want.contentHash !== entry.contentHash) differing.push({ marker: entry.marker, kind: entry.kind, legacyId: entry.legacyId, field: 'contentHash' });
+    else if (want.referenceHash !== undefined && want.referenceHash !== entry.referenceHash) differing.push({ marker: entry.marker, kind: entry.kind, legacyId: entry.legacyId, field: 'referenceHash' });
+  }
+  return differing;
+}

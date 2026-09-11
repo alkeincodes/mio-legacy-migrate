@@ -27,7 +27,7 @@ export async function runMap(options: MapOptions): Promise<string> {
   const { catalog, digest } = await fetchCatalog(options.apiBase);
 
   const warnings: PlanWarning[] = [];
-  const { pages, accessRules, warnings: pageWarnings } = mapPages(bundle);
+  const { pages, accessRules, warnings: pageWarnings, renames } = mapPages(bundle);
   warnings.push(...pageWarnings);
 
   const slugByPageId = new Map(pages.map((p) => [p.legacyPageId, p.slug]));
@@ -70,6 +70,7 @@ export async function runMap(options: MapOptions): Promise<string> {
     sourceHost: bundle.header.sourceHost,
     legacyHubDomain: bundle.header.legacyHubDomain,
     assetsPinned: bundle.header.manifestPinned !== false,
+    pageSlugRenames: renames,
     hub: {
       title: bundle.hub.title,
       slug: hubSlugFor(bundle.hub.custom_subdomain, bundle.header.legacyHubDomain, bundle.hub.id),

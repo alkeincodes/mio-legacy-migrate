@@ -137,6 +137,14 @@ export function renderReportMarkdown(report: StructuralReport, plan: Plan): stri
     );
   }
   lines.push('');
+  if ((plan.pageSlugRenames ?? []).length > 0) {
+    lines.push('## Renamed page slugs');
+    lines.push('');
+    lines.push('These legacy slugs are reserved for built-in routes on V3, so the pages live at a new slug:');
+    lines.push('');
+    for (const r of plan.pageSlugRenames ?? []) lines.push(`- /${r.legacySlug} -> /${r.slug} (legacy page ${r.legacyPageId})`);
+    lines.push('');
+  }
   lines.push('## Warnings for sign-off');
   lines.push('');
   const forSignoff = plan.warnings.filter(

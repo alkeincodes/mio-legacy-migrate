@@ -251,3 +251,15 @@ Stated so a reviewer can disagree with the decision rather than report the gap.
 - **M3 upsert on entities without a revision token runs in a maintenance window.** Until the contract shows a token for an entity type, concurrent human edits to that type during an upsert run can be lost. Accepted for M3, and the README says which types.
 - **Full-object checksum comparison needs the source to expose one.** Where legacy objects carry no full-object CRC64NVME, verification is size plus the conditional copy. Accepted; the destination checksum is recorded so M2 and later runs compare properly.
 - **Personal data may appear inside legacy settings JSON.** Mitigated by treating every local artifact as customer content and by report redaction, not by attempting to scrub JSON we do not fully understand. Accepted.
+
+### 12.x Deviation recorded 2026-09-12: reserved page slugs
+
+The backend reserves twenty page slugs that collide with built-in routes
+(`mio-backend app/pages/service.py RESERVED_SLUGS`) and answers 422
+`page_slug_reserved`. The ManTalks hub uses four of them (onboarding, login,
+register, content). The mapper renames a reserved slug with a `-page` suffix,
+rewrites internal links to the new slug, records the rename in the plan, and
+the verify report lists it. The first real apply stopped on this at legacy
+page 280339; the run resumed under `--accept-plan-change`, which only proceeds
+when every entry already done hashes identically under the new plan, so the
+hub never sits on two plans.

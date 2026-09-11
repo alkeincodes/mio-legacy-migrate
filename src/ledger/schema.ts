@@ -63,6 +63,8 @@ export interface LedgerHeader {
   targetHubId: string | null;
   runId: string;
   planHash: string;
+  /** Set when --accept-plan-change moved planHash; the hash the run started with. */
+  previousPlanHash?: string;
 }
 
 export interface LedgerFile {

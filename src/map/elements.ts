@@ -16,6 +16,8 @@ export interface ElementContext {
   hubOrigins?: string[];
   /** The manifest entry behind a legacy CDN URL, for images stored as settings.thumbnail.url. */
   assetForUrl?(url: string): { legacyMediaId: number; variant: string } | null;
+  /** The V3 slug for a legacy page slug, when the mapper renamed it (reserved or duplicate). */
+  resolvePageSlug?(legacySlug: string): string;
 }
 
 function parseSettings(raw: unknown): Record<string, unknown> {
@@ -34,11 +36,18 @@ function headlineLevel(size: unknown): number {
  * root-relative path, which V3 passes through unscoped. Everything else stays a
  * url action.
  */
-function actionFor(url: string, hubOrigins: string[]): { type: string; value: string } {
+function actionFor(
+  url: string,
+  hubOrigins: string[],
+  resolvePageSlug: (legacySlug: string) => string = (slug) => slug,
+): { type: string; value: string } {
   for (const origin of hubOrigins) {
     if (url.startsWith(origin)) {
       const path = url.slice(origin.length) || '/';
-      return { type: 'page', value: path.startsWith('/') ? path : `/${path}` };
+      const normalised = path.startsWith('/') ? path : `/${path}`;
+      // Rewrite the first segment when the mapper renamed that page's slug.
+      const rewritten = normalised.replace(/^\/([a-z0-9][a-z0-9_-]*)/, (_m, slug: string) => `/${resolvePageSlug(slug)}`);
+      return { type: 'page', value: rewritten };
     }
   }
   return { type: 'url', value: url };
@@ -122,7 +131,7 @@ export function mapElement(
         kind: 'button',
         value: content || 'Open',
         settings: {
-          action: actionFor(url, ctx.hubOrigins ?? HUB_ORIGINS),
+          action: actionFor(url, ctx.hubOrigins ?? HUB_ORIGINS, ctx.resolvePageSlug),
           variant: 'primary',
           newTab: link?.['newTab'] === true,
         },

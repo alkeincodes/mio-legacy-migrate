@@ -12,6 +12,8 @@ export interface MapContext {
   childrenOf(sectionId: number): LegacySection[];
   warn(warning: PlanWarning): void;
   mapElement(section: LegacySection, ordinal: number): CatalogNode | null;
+  /** The V3 slug for a legacy page slug, when the mapper renamed it. */
+  resolvePageSlug?(legacySlug: string): string;
 }
 
 export function assetRef(legacyMediaId: number, variant: string): string {
@@ -100,7 +102,7 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext): Cata
     const href = (settings['link'] as Record<string, unknown> | undefined)?.['url'];
     const action =
       block.type.endsWith('-page')
-        ? { type: 'page', value: pageRef(String(settings['slug'] ?? '')) }
+        ? { type: 'page', value: pageRef((ctx.resolvePageSlug ?? ((x: string) => x))(String(settings['slug'] ?? ''))) }
         : { type: 'url', value: typeof href === 'string' ? href : '' };
     return {
       id,

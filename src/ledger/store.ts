@@ -58,14 +58,8 @@ export class LedgerStore {
   ): LedgerStore {
     const store = LedgerStore.open(dir, runId);
     const actual = store.header;
-    if (opts.acceptPlanChange && actual.planHash !== expected.planHash) {
-      process.stderr.write(
-        `WARN resuming run ${runId} with a changed plan: ledger planHash ${actual.planHash.slice(0, 12)} -> ${expected.planHash.slice(0, 12)} (--accept-plan-change). Entries already done are adopted by marker; only work not yet created follows the new plan.\n`,
-      );
-      actual.planHash = expected.planHash;
-      store.flush();
-    }
     for (const field of COMPARED_HEADER_FIELDS) {
+      if (field === 'planHash' && opts.acceptPlanChange) continue;
       if (actual[field] !== expected[field]) {
         throw new LedgerMismatchError(
           `cannot resume run ${runId}: ledger ${field} is ${JSON.stringify(actual[field])} but the current inputs give ${JSON.stringify(expected[field])}. Restore the original plan (its hash is in the header) to finish this run, or start a new one.`,
@@ -86,6 +80,14 @@ export class LedgerStore {
 
   get header(): LedgerHeader {
     return this.file.header;
+  }
+
+  /** Moves the header to a new plan hash, keeping the old one; call only after every done entry was checked. */
+  acceptPlanChange(newPlanHash: string): void {
+    if (this.file.header.planHash === newPlanHash) return;
+    this.file.header.previousPlanHash = this.file.header.planHash;
+    this.file.header.planHash = newPlanHash;
+    this.flush();
   }
 
   setTargetHubId(id: string): void {

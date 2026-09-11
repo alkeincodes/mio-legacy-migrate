@@ -104,8 +104,9 @@ describe('LedgerStore.openForResume', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ledger-'));
     LedgerStore.create(dir, header());
     const store = LedgerStore.openForResume(dir, 'run-1', header({ planHash: 'different' }), { acceptPlanChange: true });
-    expect(store.header.planHash).toBe('different');
-    expect(LedgerStore.open(dir, 'run-1').header.planHash).toBe('different');
+    expect(store.header.planHash).toBe('abc123');
+    store.acceptPlanChange('different');
+    expect(LedgerStore.open(dir, 'run-1').header).toMatchObject({ planHash: 'different', previousPlanHash: 'abc123' });
   });
 
   it('refuses a resume whose target hub id differs from the recorded one', () => {

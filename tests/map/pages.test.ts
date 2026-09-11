@@ -29,10 +29,12 @@ describe('slugFor', () => {
     expect(slugFor(page({ slug: 'home' }), new Set())).toBe('home-page');
   });
 
-  it('renames every slug the backend reserves for a built-in route, which 422s as page_slug_reserved', () => {
-    for (const reserved of ['onboarding', 'login', 'register', 'content', 'members', 'my-list']) {
-      expect(slugFor(page({ slug: reserved }), new Set())).toBe(`${reserved}-page`);
-    }
+  it.each([
+    'login', 'sign-in', 'home', 'payment', 'payments', 'content', 'legal', 'playlists', 'account',
+    'history', 'messages', 'moderation', 'my-list', 'notifications', 'forgot', 'forgot-password',
+    'register', 'reset-password', 'onboarding', 'members',
+  ])('renames the reserved slug "%s", which the backend 422s as page_slug_reserved', (reserved) => {
+    expect(slugFor(page({ slug: reserved }), new Set())).toBe(`${reserved}-page`);
   });
 
   it('de-duplicates against slugs already taken', () => {
@@ -80,5 +82,20 @@ describe('hubSlugFor', () => {
     expect(hubSlugFor(null, 'alliance.mantalks.com', 7)).toBe('alliance');
     expect(hubSlugFor('The Club', 'x.example.com', 7)).toBe('the-club');
     expect(hubSlugFor(null, '', 7)).toBe('hub-7');
+  });
+});
+
+describe('mapPages renames', () => {
+  it('reports every reserved slug it renamed so the report can list them', async () => {
+    const { mapPages } = await import('../../src/map/pages.js');
+    const bundle = {
+      header: { legacyHubId: 7, legacyHubDomain: 'x.example.com' },
+      hub: { id: 7, auth: 1 },
+      pages: [page({ id: 1, slug: 'onboarding' }), page({ id: 2, slug: 'about' })],
+      sections: [], media: [], segmentables: [], segments: [], assets: [],
+    } as unknown as Parameters<typeof mapPages>[0];
+    const { renames, pages } = mapPages(bundle);
+    expect(renames).toEqual([{ legacySlug: 'onboarding', slug: 'onboarding-page', legacyPageId: 1 }]);
+    expect(pages.map((p) => p.slug)).toEqual(['about', 'onboarding-page']);
   });
 });
