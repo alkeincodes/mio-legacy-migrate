@@ -27,7 +27,18 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
 
   const tunnel = await Tunnel.open(env);
   try {
-    const session = await openSnapshot(env, tunnel.localPort);
+    let session;
+    try {
+      session = await openSnapshot(env, tunnel.localPort);
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === 'ER_ACCESS_DENIED_ERROR') {
+        throw new Error(
+          `the replica refused the login for LEGACY_DB_USER "${env.legacyDbUser}" (ER_ACCESS_DENIED_ERROR). The tunnel is fine; the read-replica user is inactive, the password is wrong, or .env names a different user than the one Atanas issued.`,
+        );
+      }
+      throw error;
+    }
     const captureStartedAt = new Date().toISOString();
     const replicaLagSeconds = await fetchReplicaLagSeconds(session);
 

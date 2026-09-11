@@ -135,4 +135,9 @@ program
     runClean({ olderThan: opts.olderThan, confirm: opts.confirm });
   });
 
-await program.parseAsync(process.argv);
+try {
+  await program.parseAsync(process.argv);
+} catch (error) {
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+}
