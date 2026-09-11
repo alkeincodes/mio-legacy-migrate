@@ -47,6 +47,20 @@ describe('loadEnv', () => {
   });
 });
 
+describe('loadEnv with replicaOnly', () => {
+  it('accepts a file that only carries the replica and SSH values', () => {
+    const path = writeEnv(COMPLETE.split('\n').filter((l) => /^(LEGACY_DB|SSH_)/.test(l)).join('\n'));
+    const env = loadEnv(path, { replicaOnly: true });
+    expect(env.legacyDbUser).toBe('reader');
+    expect(env.awsAccessKeyId).toBe('unset');
+  });
+
+  it('still names a missing replica value', () => {
+    const path = writeEnv('LEGACY_DB_HOST=h');
+    expect(() => loadEnv(path, { replicaOnly: true })).toThrow(/LEGACY_DB_USER/);
+  });
+});
+
 describe('apiKeyForProfile', () => {
   it('reads the per-profile key from the environment', () => {
     process.env.V3_API_KEY_MANTALKS_PROD = 'mio_sk_test';

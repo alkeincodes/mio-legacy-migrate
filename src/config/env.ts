@@ -44,11 +44,28 @@ export interface Env {
   v3VerifyLoginPassword: string;
 }
 
-export function loadEnv(dotenvPath = '.env'): Env {
+/** The subset a replica-only step needs: extract --check-access opens the tunnel and one SELECT. */
+const REPLICA_ONLY_KEYS = [
+  'LEGACY_DB_HOST', 'LEGACY_DB_PORT', 'LEGACY_DB_USER', 'LEGACY_DB_PASSWORD', 'LEGACY_DB_NAME',
+  'SSH_BOX_HOST', 'SSH_BOX_USER', 'SSH_KNOWN_HOSTS_FILE',
+] as const;
+
+export function loadEnv(dotenvPath = '.env', opts: { replicaOnly?: boolean } = {}): Env {
   // Validate the file on its own so a stale shell variable cannot mask a
   // missing entry; .env is the only source for these values.
   const fileVars = parseDotenv(readFileSync(dotenvPath, 'utf8'));
-  const parsed = EnvSchema.safeParse(fileVars);
+  const schema = opts.replicaOnly
+    ? EnvSchema.pick(Object.fromEntries(REPLICA_ONLY_KEYS.map((k) => [k, true])) as Record<(typeof REPLICA_ONLY_KEYS)[number], true>)
+        .transform((partial) => ({
+          ...Object.fromEntries(Object.keys(EnvSchema.shape).map((k) => [k, 'unset'])),
+          AWS_REGION: 'us-east-1',
+          LEGACY_S3_URL: 'https://unset.invalid',
+          LEGACY_CDN_URL: 'https://unset.invalid',
+          ...partial,
+        }))
+        .pipe(EnvSchema)
+    : EnvSchema;
+  const parsed = schema.safeParse(fileVars);
   if (!parsed.success) {
     const missing = parsed.error.issues.map((i) => i.path.join('.')).sort();
     throw new Error(

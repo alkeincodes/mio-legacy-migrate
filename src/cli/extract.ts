@@ -21,7 +21,8 @@ export interface ExtractOptions {
 }
 
 export async function runExtract(options: ExtractOptions): Promise<string> {
-  const env = loadEnv();
+  // --check-access opens the tunnel and runs one SELECT, so it needs only the replica values.
+  const env = loadEnv('.env', { replicaOnly: options.checkAccess });
   logger.setSecrets(secretsOf(env));
 
   const tunnel = await Tunnel.open(env);
