@@ -177,6 +177,8 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
         replicaLagSeconds,
         distinctSectionTypes: sectionTypes,
         manifestPinned: !options.skipS3,
+        legacyCdnUrl: env.legacyCdnUrl,
+        legacyS3Url: options.skipS3 ? env.legacyCdnUrl : env.legacyS3Url,
       },
       hub, theme, pages, sections, menuItems, playlists, playlistItems, files,
       hubFiles, folders, media, discussionCategories, achievements,

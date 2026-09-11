@@ -26,6 +26,9 @@ export async function openSnapshot(env: Env, localPort: number): Promise<Snapsho
     dateStrings: true,
     supportBigNumbers: true,
     bigNumberStrings: false,
+    // JSON columns (sections.settings, hub_theme.settings, media.generated_conversions)
+    // come back as strings, as the row types say; mysql2 would otherwise parse them.
+    jsonStrings: true,
   });
   await conn.query('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
   await conn.query('START TRANSACTION WITH CONSISTENT SNAPSHOT');

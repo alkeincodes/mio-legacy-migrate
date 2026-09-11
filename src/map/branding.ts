@@ -1,6 +1,7 @@
 import type { LegacyHubTheme, LegacyMedia } from '../extract/queries.js';
 import { cdnUrlFor, variantsOf } from '../extract/mediaPaths.js';
 import type { PlanWarning } from './plan.js';
+import { parseJsonObject } from '../extract/json.js';
 
 /** Legacy Spatie collection name to V3 branding key. */
 const COLLECTION_TO_KEY: Record<string, string> = {
@@ -26,14 +27,17 @@ export function mapBranding(
   if (!theme) {
     warnings.push(warn('the hub has no hub_theme row for its current_theme_id; branding is left at V3 defaults'));
   } else {
-    let settings: Record<string, unknown> = {};
-    try {
-      const parsed: unknown = JSON.parse(theme.settings ?? '{}');
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        settings = parsed as Record<string, unknown>;
-      }
-    } catch {
-      warnings.push(warn('hub_theme.settings is not valid JSON; branding is left at V3 defaults'));
+    const settings = parseJsonObject(theme.settings);
+    if (Object.keys(settings).length === 0) {
+      warnings.push(warn('hub_theme.settings is empty or not valid JSON; branding is left at V3 defaults'));
+    }
+    const fonts = settings['fonts'] as Record<string, unknown> | undefined;
+    if (fonts && (fonts['body'] || fonts['heading'])) {
+      warnings.push(
+        warn(
+          `legacy theme names fonts (body ${String(fonts['body'] ?? 'default')}, heading ${String(fonts['heading'] ?? 'default')}); V3 branding has no documented font key, so the V3 default typeface is used`,
+        ),
+      );
     }
 
     const colours = (settings['colors'] ?? {}) as Record<string, unknown>;

@@ -1,4 +1,5 @@
 import type { LegacySection } from '../extract/queries.js';
+import { parseJsonObject } from '../extract/json.js';
 import type { CatalogNode } from './catalog.js';
 import { nodeId } from './nodeId.js';
 import type { PlanWarning } from './plan.js';
@@ -25,16 +26,8 @@ export function pageRef(slug: string): string {
   return slug;
 }
 
-function parseSettings(raw: string | null): Record<string, unknown> {
-  if (!raw) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
-  }
+function parseSettings(raw: unknown): Record<string, unknown> {
+  return parseJsonObject(raw);
 }
 
 function sixDigitHex(value: unknown): string | null {
@@ -46,7 +39,8 @@ function surfaceFor(section: LegacySection, settings: Record<string, unknown>): 
   const background = settings['background'] as Record<string, unknown> | undefined;
   if (background) {
     const colour = sixDigitHex(background['color']);
-    const imageUrl = (background['image'] as Record<string, unknown> | undefined)?.['url'];
+    const image = background['image'];
+    const imageUrl = typeof image === 'string' ? image : (image as Record<string, unknown> | undefined)?.['url'];
     if (background['type'] === 'color' && colour) {
       surface['background'] = { type: 'custom-color', value: colour };
     } else if (background['type'] === 'image' && typeof imageUrl === 'string') {

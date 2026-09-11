@@ -317,10 +317,18 @@ function planOperations(plan: Plan): Operation[] {
   operations.push({ order: order++, kind: 'hub.create', summary: `create hub "${plan.hub.title}" at slug ${plan.hub.slug}`, detail: { slug: plan.hub.slug } });
   operations.push({ order: order++, kind: 'hub.branding', summary: `write ${Object.keys(plan.branding).length} branding keys`, detail: plan.branding });
   for (const segment of plan.segments) {
-    operations.push({ order: order++, kind: 'segment.create', summary: `create segment "${segment.name}"${segment.mappable ? '' : ' (conditions not portable)'}`, detail: { legacySegmentId: segment.legacySegmentId } });
+    operations.push({ order: order++, kind: 'segment.skip', summary: `skip segment "${segment.name}": no V3 condition mapping in M1`, detail: { legacySegmentId: segment.legacySegmentId } });
   }
+  // Every M1 rule is in_segment, and no segment is created, so no rule maps and its page holds.
+  const mappedTargets = new Set<string>();
   for (const rule of plan.accessRules) {
-    operations.push({ order: order++, kind: 'accessRule.create', summary: `gate ${rule.targetKind} ${rule.targetRef}`, detail: { conditions: rule.conditions.length } });
+    const needsSegment = rule.conditions.some((c) => c.condition_type === 'in_segment');
+    if (needsSegment) {
+      operations.push({ order: order++, kind: 'accessRule.skip', summary: `skip the gate on ${rule.targetKind} ${rule.targetRef}: its segment is not created in M1`, detail: { conditions: rule.conditions.length } });
+    } else {
+      operations.push({ order: order++, kind: 'accessRule.create', summary: `gate ${rule.targetKind} ${rule.targetRef}`, detail: { conditions: rule.conditions.length } });
+      mappedTargets.add(rule.targetRef);
+    }
   }
   for (const folder of plan.folders) {
     operations.push({ order: order++, kind: 'folder.create', summary: `create folder "${folder.name}"`, detail: { legacyFolderId: folder.legacyFolderId } });
@@ -338,7 +346,6 @@ function planOperations(plan: Plan): Operation[] {
   for (const playlist of plan.playlists) {
     operations.push({ order: order++, kind: 'playlist.create', summary: `create playlist "${playlist.title}" with ${playlist.items.length} items`, detail: { legacyPlaylistId: playlist.legacyPlaylistId } });
   }
-  const mappedTargets = new Set(plan.accessRules.map((r) => r.targetRef));
   for (const page of plan.pages) {
     operations.push({ order: order++, kind: 'page.create', summary: `create draft page /${page.slug}`, detail: { privacy: page.privacy } });
   }

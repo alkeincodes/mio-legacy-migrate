@@ -31,8 +31,8 @@ export async function runMap(options: MapOptions): Promise<string> {
   const { branding, warnings: brandingWarnings } = mapBranding(
     bundle.theme,
     bundle.media.filter((m) => m.model_type === MORPH_HUB),
-    process.env['LEGACY_CDN_URL'] ?? '',
-    process.env['LEGACY_S3_URL'] ?? '',
+    bundle.header.legacyCdnUrl ?? process.env['LEGACY_CDN_URL'] ?? '',
+    bundle.header.legacyS3Url ?? process.env['LEGACY_S3_URL'] ?? '',
   );
   warnings.push(...brandingWarnings);
 

@@ -1,8 +1,35 @@
 import type { Bundle } from '../extract/bundle.js';
 import { MORPH_PAGE } from '../extract/queries.js';
 import type { PlanNavigation, PlanNavigationItem, PlanWarning } from './plan.js';
+import { parseJsonObject } from '../extract/json.js';
 
 const MAX_LABEL = 120;
+
+/** Text nodes of a TipTap/ProseMirror document, joined; the legacy menu editor stores a url this way. */
+function docText(node: unknown): string {
+  if (!node || typeof node !== 'object') return '';
+  const n = node as { text?: unknown; content?: unknown[] };
+  if (typeof n.text === 'string') return n.text;
+  return (n.content ?? []).map(docText).join('');
+}
+
+/**
+ * Legacy stores a menu link as settings.url, which is either a plain URL or a
+ * TipTap document whose text is the URL; older rows use settings.link.url.
+ */
+export function menuItemHref(settings: Record<string, unknown>): string {
+  const link = settings['link'] as Record<string, unknown> | undefined;
+  if (typeof link?.['url'] === 'string') return link['url'].trim();
+  const url = settings['url'];
+  if (typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('{')) return trimmed;
+  try {
+    return docText(JSON.parse(trimmed)).trim();
+  } catch {
+    return '';
+  }
+}
 
 export function mapNavigation(
   bundle: Bundle,
@@ -42,13 +69,7 @@ export function mapNavigation(
       continue;
     }
 
-    let href = '';
-    try {
-      const settings = JSON.parse(item.settings ?? '{}') as { link?: { url?: unknown } };
-      if (typeof settings.link?.url === 'string') href = settings.link.url;
-    } catch {
-      href = '';
-    }
+    const href = menuItemHref(parseJsonObject(item.settings));
     if (!href) {
       warnings.push({
         pageSlug: null,

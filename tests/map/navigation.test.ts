@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapNavigation } from '../../src/map/navigation.js';
+import { mapNavigation, menuItemHref } from '../../src/map/navigation.js';
 import type { Bundle } from '../../src/extract/bundle.js';
 import type { LegacyMenuItem } from '../../src/extract/queries.js';
 
@@ -69,5 +69,20 @@ describe('mapNavigation', () => {
     const { navigation, warnings } = mapNavigation(bundle([item({ title: long })]), slugs);
     expect(navigation.header[0]?.label).toHaveLength(120);
     expect(warnings.some((w) => w.reason.includes('truncated'))).toBe(true);
+  });
+});
+
+describe('menuItemHref', () => {
+  it('reads a plain settings.url', () => {
+    expect(menuItemHref({ url: 'https://blog.example.com ' })).toBe('https://blog.example.com');
+  });
+
+  it('reads the text of a TipTap document stored in settings.url, which is how the legacy editor saves it', () => {
+    const doc = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'mailto:info@example.com' }] }] });
+    expect(menuItemHref({ url: doc })).toBe('mailto:info@example.com');
+  });
+
+  it('still honours the older settings.link.url shape', () => {
+    expect(menuItemHref({ link: { url: '/courses' } })).toBe('/courses');
   });
 });

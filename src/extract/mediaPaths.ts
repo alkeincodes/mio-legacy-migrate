@@ -1,4 +1,5 @@
 import type { LegacyMedia } from './queries.js';
+import { parseJsonObject } from './json.js';
 
 export interface MediaVariant {
   variant: string;
@@ -22,17 +23,7 @@ export function variantsOf(media: LegacyMedia): MediaVariant[] {
     },
   ];
 
-  let generated: Record<string, unknown> = {};
-  if (media.generated_conversions) {
-    try {
-      const parsed: unknown = JSON.parse(media.generated_conversions);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        generated = parsed as Record<string, unknown>;
-      }
-    } catch {
-      return out;
-    }
-  }
+  const generated = parseJsonObject(media.generated_conversions);
 
   const dot = media.file_name.lastIndexOf('.');
   const base = dot > 0 ? media.file_name.slice(0, dot) : media.file_name;

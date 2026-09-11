@@ -140,3 +140,19 @@ describe('lookupMapping', () => {
     expect(lookupMapping('grid', 'block')).toBeNull();
   });
 });
+
+describe('settings that arrive already parsed', () => {
+  it('reads an object settings value the same as its JSON string, because mysql2 parses JSON columns', () => {
+    const fixture = loadFixture('row');
+    const asObject = { ...fixture.section, settings: JSON.parse(fixture.section.settings ?? '{}') as unknown as string };
+    const node = mapSection(asObject, 0, contextFor({ ...fixture, section: asObject }, []));
+    expect((node.settings?.['surface'] as Record<string, unknown>)['background']).toEqual({ type: 'custom-color', value: '#101820' });
+  });
+
+  it('carries a background image given as a plain URL string', () => {
+    const fixture = loadFixture('row');
+    const section = { ...fixture.section, settings: JSON.stringify({ background: { type: 'image', image: 'https://cdn.example.com/bg.png' } }) };
+    const node = mapSection(section, 0, contextFor({ ...fixture, section }, []));
+    expect((node.settings?.['surface'] as Record<string, unknown>)['background']).toEqual({ type: 'image', url: 'https://cdn.example.com/bg.png', blur: false });
+  });
+});

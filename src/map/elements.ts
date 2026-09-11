@@ -1,4 +1,5 @@
 import type { LegacySection } from '../extract/queries.js';
+import { parseJsonObject } from '../extract/json.js';
 import type { CatalogNode } from './catalog.js';
 import { nodeId } from './nodeId.js';
 import type { PlanWarning } from './plan.js';
@@ -15,16 +16,8 @@ export interface ElementContext {
   hubOrigins?: string[];
 }
 
-function parseSettings(raw: string | null): Record<string, unknown> {
-  if (!raw) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
-  }
+function parseSettings(raw: unknown): Record<string, unknown> {
+  return parseJsonObject(raw);
 }
 
 /** Legacy headline sizes; the editor collapses subHeadline into headline + size medium. */

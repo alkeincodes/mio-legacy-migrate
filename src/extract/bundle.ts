@@ -22,6 +22,9 @@ export interface BundleHeader {
   distinctSectionTypes: string[];
   /** False after `extract --skip-s3` until `extract --s3-only` pins the manifest. Absent means pinned. */
   manifestPinned?: boolean;
+  /** The legacy CDN and S3 bases the manifest URLs were built with; map needs them for hub branding media. */
+  legacyCdnUrl?: string;
+  legacyS3Url?: string;
 }
 
 export interface Bundle {
