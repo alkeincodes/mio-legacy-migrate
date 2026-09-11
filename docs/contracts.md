@@ -61,3 +61,16 @@ header the route accepts, if any.
   `condition_type`. Apply sends only the three documented condition types
   (`has_entitlement`, `in_segment`, `past_drip_date`) with their documented
   shapes.
+- **Segments are not created in M1.** `POST /api/v1/teams/{team_id}/segments`
+  demands a typed condition tree (`conditions.version: 1`, `groups[].logic:
+  "AND"`, discriminated condition members, `app/segments/schemas.py:801-805`)
+  and no legacy-to-V3 condition mapping exists yet. The segments stage records
+  each legacy segment as unmapped; every access rule that depends on one is
+  skipped, and the page that rule would have gated stays unpublished.
+- **Navigation url items store root-relative hrefs only**
+  (`app/hubs/validation.py:329-354`). A same-origin legacy link is rewritten to
+  its path; an off-site link is dropped with a run warning.
+- **The folder marker rides in the name** as ` [lgc:...]`, because folders
+  have no free-text column. Adoption matches on that suffix.
+- **Achievements and segments require `Content-Type: application/vnd.api+json`**
+  (`require_jsonapi_content_type`); the client sends it on every write.

@@ -107,6 +107,8 @@ export interface Plan {
   catalogDigest: string;
   legacyHubId: number;
   sourceHost: string;
+  /** Set by map from the bundle header; older plans may lack it. */
+  legacyHubDomain?: string;
   hub: PlanHub;
   branding: Record<string, string>;
   pages: PlanPage[];

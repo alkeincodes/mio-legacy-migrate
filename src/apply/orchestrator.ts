@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { loadEnv, apiKeyForProfile, secretsOf } from '../config/env.js';
 import { loadProfile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { TOOL_VERSION } from '../version.js';
-import { readPlan, planHash, contentHash, type Plan, type PlanPage } from '../map/plan.js';
+import { readPlan, planHash, type Plan } from '../map/plan.js';
 import { fetchCatalog } from '../map/catalog.js';
 import { assertContract, loadContracts, type EntityKind } from './contracts.js';
 import { Budget, budgetIdentity } from './budget.js';
@@ -14,13 +16,16 @@ import { preflight } from './preflight.js';
 import { renderDryRun, type Operation } from './dryRun.js';
 import { LedgerStore, ledgerDir } from '../ledger/store.js';
 import { Lock, assertLedgerClean, HEARTBEAT_INTERVAL_MS } from '../ledger/lock.js';
-import { recordMarker } from '../ledger/marker.js';
-import { adoptOrCreate } from './inflight.js';
 import { deleteOrphans, findOrphans, runAssetStage, type AssetRunner } from './assets.js';
 import { checkAccess } from './checkAccess.js';
 import { type S3Ops } from './s3.js';
 import { playbackPrefilter, writePlaybackReport, type PlaybackResult } from './playbackPrefilter.js';
-import { APPLY_ORDER, resolveRefs, shouldPublish } from './order.js';
+import { APPLY_ORDER, shouldPublish } from './order.js';
+import {
+  accessRulesStage, achievementsStage, attachFoldersStage, brandingStage, foldersStage, hubStage,
+  navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, segmentsStage, spacesStage,
+  type StageContext,
+} from './stages.js';
 import type { LedgerHeader } from '../ledger/schema.js';
 
 export interface ApplyOptions {
@@ -206,72 +211,74 @@ export async function runApply(options: ApplyOptions): Promise<string> {
   };
 
   const playbackResults: PlaybackResult[] = [];
+  const runWarnings: string[] = [];
+  const ctx: StageContext = {
+    plan, store, api, profile, runId,
+    hubId: store.header.targetHubId ?? '',
+    playbackOk: new Set<string>(),
+    warn: (reason) => { runWarnings.push(reason); logger.warn(reason); },
+  };
+  const hubOrigins = plan.legacyHubDomain
+    ? [`https://${plan.legacyHubDomain}`, `http://${plan.legacyHubDomain}`]
+    : [];
+  let mappedRuleTargets = new Set<string>();
 
   try {
     for (const stage of APPLY_ORDER) {
       logger.info('stage starting', { stage, runId });
-
-      if (stage === 'hub') {
-        const marker = recordMarker(plan.sourceHost, plan.legacyHubId, runId);
-        const hubId = await adoptOrCreate({
-          marker,
-          list: async () => {
-            const found: string[] = [];
-            for await (const row of api.listAll<{ id: string; attributes: { meta?: Record<string, unknown> } }>(
-              `/api/v1/teams/${profile.teamId}/hubs/`,
-            )) {
-              if (row.attributes?.meta?.['lgcMarker'] === marker) found.push(row.id);
-            }
-            return found;
-          },
-          create: async () => {
-            const response = await api.post<{ data: { id: string } }>(
-              `/api/v1/teams/${profile.teamId}/hubs/`,
-              {
-                data: {
-                  type: 'hubs',
-                  attributes: {
-                    title: plan.hub.title,
-                    slug: plan.hub.slug,
-                    description: plan.hub.description,
-                    is_private: true,
-                    meta: { lgcMarker: marker },
-                  },
-                },
-              },
-              'hubs.create',
-            );
-            return response.data.id;
-          },
-          onIntent: () => upsertRecord(store, 'hubs', plan.legacyHubId, 'hub', marker, null, 'intent', runId, contentHash(plan.hub)),
-          onAdopted: (id) => { store.setTargetHubId(id); upsertRecord(store, 'hubs', plan.legacyHubId, 'hub', marker, id, 'done', runId, contentHash(plan.hub)); },
-          onCreated: (id) => { store.setTargetHubId(id); upsertRecord(store, 'hubs', plan.legacyHubId, 'hub', marker, id, 'done', runId, contentHash(plan.hub)); },
-        });
-        logger.info('hub ready', { hubId });
-        continue;
-      }
-
-      if (stage === 'assets') {
-        // The prefilter gates every legacy URL before it can reach a page node.
-        for (const asset of plan.assets.filter((a) => a.isVideo && a.visibility === 'public')) {
-          const results = await playbackPrefilter(asset.cdnUrl);
-          playbackResults.push(...results);
+      switch (stage) {
+        case 'hub':
+          ctx.hubId = await hubStage(ctx);
+          break;
+        case 'branding':
+          await brandingStage(ctx);
+          break;
+        case 'segments':
+          await segmentsStage(ctx);
+          break;
+        case 'accessRules':
+          mappedRuleTargets = await accessRulesStage(ctx);
+          break;
+        case 'folders':
+          await foldersStage(ctx);
+          break;
+        case 'assets': {
+          // The prefilter gates every legacy URL before it can reach a page node.
+          for (const asset of plan.assets.filter((a) => a.isVideo && a.visibility === 'public')) {
+            const results = await playbackPrefilter(asset.cdnUrl);
+            playbackResults.push(...results);
+            if (results.length > 0 && results.every((r) => r.ok)) ctx.playbackOk.add(asset.cdnUrl);
+          }
+          await runAssetStage({
+            assets: plan.assets, store, s3, runner: assetRunner,
+            teamId: profile.teamId, bucket: profile.bucket, sourceHost: plan.sourceHost,
+          });
+          await attachFoldersStage(ctx);
+          break;
         }
-        await runAssetStage({
-          assets: plan.assets,
-          store,
-          s3,
-          runner: assetRunner,
-          teamId: profile.teamId,
-          bucket: profile.bucket,
-          sourceHost: plan.sourceHost,
-        });
-        continue;
+        case 'playlists':
+          await playlistsStage(ctx);
+          break;
+        case 'pageDrafts':
+          await pageDraftsStage(ctx);
+          break;
+        case 'pageTrees':
+          await pageTreesStage(ctx, mappedRuleTargets);
+          break;
+        case 'navigation':
+          await navigationStage(ctx, hubOrigins);
+          break;
+        case 'spaces':
+          await spacesStage(ctx);
+          break;
+        case 'achievements':
+          await achievementsStage(ctx);
+          break;
       }
-
       logger.info('stage complete', { stage });
     }
 
+    writeRunWarnings(runWarnings, `runs/${runId}`);
     writePlaybackReport(playbackResults, `runs/${runId}`);
     logger.info('apply finished', { runId, ledger: store.path });
     return runId;
@@ -289,27 +296,9 @@ export async function runApply(options: ApplyOptions): Promise<string> {
   }
 }
 
-function upsertRecord(
-  store: LedgerStore,
-  legacyTable: string,
-  legacyId: number,
-  kind: EntityKind,
-  marker: string,
-  v3Id: string | null,
-  state: 'intent' | 'done',
-  runId: string,
-  hash: string,
-): void {
-  const existing = store.find(marker);
-  store.upsert({
-    legacyTable, legacyId, kind, variant: null, marker, v3Id, state, runId,
-    createdAt: existing?.createdAt ?? new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    contentHash: hash,
-    referenceHash: existing?.referenceHash ?? null,
-    revisionToken: existing?.revisionToken ?? null,
-    asset: null,
-  });
+function writeRunWarnings(warnings: string[], runDir: string): void {
+  mkdirSync(runDir, { recursive: true });
+  writeFileSync(join(runDir, 'apply-warnings.json'), JSON.stringify(warnings, null, 2), 'utf8');
 }
 
 function planOperations(plan: Plan): Operation[] {

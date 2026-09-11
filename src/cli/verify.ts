@@ -59,7 +59,8 @@ export async function runVerify(opts: {
 
   const runDir = `runs/${opts.runId}`;
   const v3Origin = `https://hub.member.dev/${plan.hub.slug}`;
-  const legacyOrigin = 'https://alliance.mantalks.com';
+  if (!plan.legacyHubDomain) throw new Error('the plan carries no legacyHubDomain; re-run map');
+  const legacyOrigin = `https://${plan.legacyHubDomain}`;
 
   await captureContactSheet({
     env, slugs: plan.pages.map((p) => p.slug), legacyOrigin, v3Origin,

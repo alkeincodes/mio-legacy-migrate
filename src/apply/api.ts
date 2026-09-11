@@ -48,7 +48,8 @@ export class ApiClient {
   private headers(extra: Record<string, string> = {}): Record<string, string> {
     return {
       Authorization: `Bearer ${this.opts.apiKey}`,
-      'Content-Type': 'application/json',
+      // Achievements and segments 415 on anything else (require_jsonapi_content_type).
+      'Content-Type': 'application/vnd.api+json',
       Accept: 'application/vnd.api+json, application/json',
       ...extra,
     };
@@ -112,9 +113,15 @@ export class ApiClient {
     return { body: result.body as T, etag: result.etag };
   }
 
-  async post<T>(path: string, body: unknown, op?: BudgetOp): Promise<T> {
+  async post<T>(
+    path: string,
+    body: unknown,
+    op?: BudgetOp,
+    opts: { ifMatch?: string } = {},
+  ): Promise<T> {
     if (op) this.opts.budget.assertCanSpend(op, 1);
-    return (await this.send('POST', path, body, {}, op, true)).body as T;
+    const headers: Record<string, string> = opts.ifMatch ? { 'If-Match': opts.ifMatch } : {};
+    return (await this.send('POST', path, body, headers, op, true)).body as T;
   }
 
   async patch<T>(
@@ -153,7 +160,8 @@ export class ApiClient {
     while (next) {
       const { body }: { body: JsonApiList<T> } = await this.get<JsonApiList<T>>(next);
       for (const row of body.data ?? []) yield row;
-      next = body.links?.next;
+      // The backend builds links.next on the bare /api/ twin; use the /api/v1/ spelling.
+      next = body.links?.next?.replace(/^\/api\/(?!v1\/)/, '/api/v1/');
       pages += 1;
       if (pages > 1_000) throw new Error(`listAll(${path}) exceeded 1000 pages; refusing to loop`);
     }

@@ -62,6 +62,7 @@ export async function runMap(options: MapOptions): Promise<string> {
     catalogDigest: digest,
     legacyHubId: bundle.header.legacyHubId,
     sourceHost: bundle.header.sourceHost,
+    legacyHubDomain: bundle.header.legacyHubDomain,
     hub: {
       title: bundle.hub.title,
       slug: bundle.header.legacyHubDomain.split('.')[0] ?? `hub-${bundle.hub.id}`,
