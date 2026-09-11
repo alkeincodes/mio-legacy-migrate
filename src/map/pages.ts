@@ -133,6 +133,7 @@ export function mapPages(bundle: Bundle): {
       childrenOf: (id) => (sectionsByParent.get(id) ?? []).slice().sort(byPosition),
       warn: (w) => warnings.push(w),
       resolvePageSlug,
+      pageSlugById: (legacyPageId) => slugByPage.get(legacyPageId) ?? null,
       mapElement: (section, ordinal) =>
         mapElement(section, ordinal, {
           legacyHubId: bundle.header.legacyHubId,

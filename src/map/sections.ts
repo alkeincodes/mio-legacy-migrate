@@ -4,6 +4,7 @@ import type { CatalogNode } from './catalog.js';
 import { nodeId } from './nodeId.js';
 import type { PlanWarning } from './plan.js';
 import { lookupMapping } from './sectionTable.js';
+import { docToText, parseDoc } from './tiptap.js';
 
 export interface MapContext {
   legacyHubId: number;
@@ -14,6 +15,8 @@ export interface MapContext {
   mapElement(section: LegacySection, ordinal: number): CatalogNode | null;
   /** The V3 slug for a legacy page slug, when the mapper renamed it. */
   resolvePageSlug?(legacySlug: string): string;
+  /** The V3 slug of a legacy page by id, for cards whose target is a page row. */
+  pageSlugById?(legacyPageId: number): string | null;
 }
 
 export function assetRef(legacyMediaId: number, variant: string): string {
@@ -99,11 +102,24 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext): Cata
   }
 
   if (block.type.endsWith('-page') || block.type.endsWith('-url') || block.type === 'carousel-cta') {
-    const href = (settings['link'] as Record<string, unknown> | undefined)?.['url'];
-    const action =
-      block.type.endsWith('-page')
-        ? { type: 'page', value: pageRef((ctx.resolvePageSlug ?? ((x: string) => x))(String(settings['slug'] ?? ''))) }
-        : { type: 'url', value: typeof href === 'string' ? href : '' };
+    // Same shapes as a button element: the link URL is a TipTap document, the
+    // label is settings.link.label, and a page target is the row's model_id.
+    const link = settings['link'] as Record<string, unknown> | undefined;
+    const urlDoc = parseDoc(link?.['url']);
+    const href = urlDoc ? docToText(urlDoc) : typeof link?.['url'] === 'string' ? link['url'].trim() : '';
+    const label = typeof link?.['label'] === 'string' && link['label'].trim() ? link['label'].trim() : block.title ?? 'Open';
+    let action: { type: string; value: string };
+    if (block.type.endsWith('-page')) {
+      const byId = block.model_id === null ? null : (ctx.pageSlugById?.(block.model_id) ?? null);
+      const bySlug = typeof settings['slug'] === 'string' && settings['slug'] ? (ctx.resolvePageSlug ?? ((x: string) => x))(settings['slug']) : '';
+      const slug = byId ?? bySlug;
+      action = { type: 'page', value: slug ? `/${pageRef(slug)}` : '' };
+      if (!slug) {
+        ctx.warn({ pageSlug: ctx.pageSlug, legacySectionId: block.id, type: 'approximated', reason: `page card "${label}" has no resolvable page target` });
+      }
+    } else {
+      action = { type: 'url', value: href };
+    }
     return {
       id,
       kind: 'content-card',
@@ -112,8 +128,8 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext): Cata
         {
           id: nodeId(ctx.legacyHubId, ctx.legacyPageId, block.id, ordinal + 1000),
           kind: 'button',
-          value: block.title ?? 'Open',
-          settings: { action, variant: 'primary' },
+          value: label,
+          settings: { action, variant: 'primary', newTab: link?.['newTab'] === true },
         },
       ],
     };

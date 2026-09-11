@@ -156,3 +156,23 @@ describe('settings that arrive already parsed', () => {
     expect((node.settings?.['surface'] as Record<string, unknown>)['background']).toEqual({ type: 'image', url: 'https://cdn.example.com/bg.png', blur: false });
   });
 });
+
+describe('page and url cards with real legacy shapes', () => {
+  it('resolves a page card by the row model_id and takes its label from settings.link.label', () => {
+    const fixture = loadFixture('grid-page');
+    const card = { ...fixture.children[0]!, model_type: 'App\\Page', model_id: 284465, settings: JSON.stringify({ link: { label: 'Start' } }) };
+    const node = mapSection(fixture.section, 0, { ...contextFor({ ...fixture, children: [card] }, []), pageSlugById: (id) => (id === 284465 ? 'start-here' : null) });
+    const button = node.children?.[0]?.children?.[0];
+    expect(button?.value).toBe('Start');
+    expect(button?.settings?.['action']).toEqual({ type: 'page', value: '/start-here' });
+  });
+
+  it('reads a url card link out of its TipTap document', () => {
+    const fixture = loadFixture('grid-url');
+    const doc = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'https://x.example.com/a' }] }] });
+    const card = { ...fixture.children[0]!, settings: JSON.stringify({ link: { url: doc, label: 'Go', newTab: true } }) };
+    const button = mapSection(fixture.section, 0, contextFor({ ...fixture, children: [card] }, [])).children?.[0]?.children?.[0];
+    expect(button?.settings?.['action']).toEqual({ type: 'url', value: 'https://x.example.com/a' });
+    expect(button?.settings?.['newTab']).toBe(true);
+  });
+});
