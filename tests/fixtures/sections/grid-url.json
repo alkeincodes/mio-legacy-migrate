@@ -1,0 +1,39 @@
+{
+  "section": {
+    "id": 22500,
+    "hub_id": 7,
+    "page_id": 100,
+    "parent_id": null,
+    "model_type": null,
+    "model_id": null,
+    "hidden": 0,
+    "type": "grid",
+    "title": "grid section",
+    "label": null,
+    "settings": "{}",
+    "permissions": null,
+    "meta": null,
+    "position": 0,
+    "segment_id": null
+  },
+  "children": [
+    {
+      "id": 22501,
+      "hub_id": 7,
+      "page_id": null,
+      "parent_id": 22500,
+      "model_type": null,
+      "model_id": null,
+      "hidden": 0,
+      "type": "grid-url",
+      "title": null,
+      "label": null,
+      "settings": "{\"link\":{\"url\":\"https://example.com\"}}",
+      "permissions": null,
+      "meta": null,
+      "position": 0,
+      "segment_id": null
+    }
+  ],
+  "grandchildren": []
+}

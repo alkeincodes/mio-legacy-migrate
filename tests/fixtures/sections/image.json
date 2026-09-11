@@ -1,0 +1,39 @@
+{
+  "section": {
+    "id": 21300,
+    "hub_id": 7,
+    "page_id": 100,
+    "parent_id": null,
+    "model_type": null,
+    "model_id": null,
+    "hidden": 0,
+    "type": "image",
+    "title": "image section",
+    "label": null,
+    "settings": "{}",
+    "permissions": null,
+    "meta": null,
+    "position": 0,
+    "segment_id": null
+  },
+  "children": [
+    {
+      "id": 21301,
+      "hub_id": 7,
+      "page_id": null,
+      "parent_id": 21300,
+      "model_type": null,
+      "model_id": null,
+      "hidden": 0,
+      "type": "column",
+      "title": null,
+      "label": null,
+      "settings": "{\"size\":\"1/1\"}",
+      "permissions": null,
+      "meta": null,
+      "position": 0,
+      "segment_id": null
+    }
+  ],
+  "grandchildren": []
+}

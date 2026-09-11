@@ -1,0 +1,39 @@
+{
+  "section": {
+    "id": 22100,
+    "hub_id": 7,
+    "page_id": 100,
+    "parent_id": null,
+    "model_type": null,
+    "model_id": null,
+    "hidden": 0,
+    "type": "grid",
+    "title": "grid section",
+    "label": null,
+    "settings": "{}",
+    "permissions": null,
+    "meta": null,
+    "position": 0,
+    "segment_id": null
+  },
+  "children": [
+    {
+      "id": 22101,
+      "hub_id": 7,
+      "page_id": null,
+      "parent_id": 22100,
+      "model_type": "App\\File",
+      "model_id": 5,
+      "hidden": 0,
+      "type": "grid-file",
+      "title": null,
+      "label": null,
+      "settings": "{}",
+      "permissions": null,
+      "meta": null,
+      "position": 0,
+      "segment_id": null
+    }
+  ],
+  "grandchildren": []
+}

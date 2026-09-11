@@ -1,0 +1,39 @@
+{
+  "section": {
+    "id": 22000,
+    "hub_id": 7,
+    "page_id": 100,
+    "parent_id": null,
+    "model_type": null,
+    "model_id": null,
+    "hidden": 0,
+    "type": "search",
+    "title": "search section",
+    "label": null,
+    "settings": "{}",
+    "permissions": null,
+    "meta": null,
+    "position": 0,
+    "segment_id": null
+  },
+  "children": [
+    {
+      "id": 22001,
+      "hub_id": 7,
+      "page_id": null,
+      "parent_id": 22000,
+      "model_type": "App\\Playlist",
+      "model_id": 42,
+      "hidden": 0,
+      "type": "search-playlist",
+      "title": null,
+      "label": null,
+      "settings": "{\"scope\":\"all\"}",
+      "permissions": null,
+      "meta": null,
+      "position": 0,
+      "segment_id": null
+    }
+  ],
+  "grandchildren": []
+}

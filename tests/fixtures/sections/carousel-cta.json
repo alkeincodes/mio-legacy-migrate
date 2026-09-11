@@ -1,0 +1,39 @@
+{
+  "section": {
+    "id": 22600,
+    "hub_id": 7,
+    "page_id": 100,
+    "parent_id": null,
+    "model_type": null,
+    "model_id": null,
+    "hidden": 0,
+    "type": "carousel",
+    "title": "carousel section",
+    "label": null,
+    "settings": "{}",
+    "permissions": null,
+    "meta": null,
+    "position": 0,
+    "segment_id": null
+  },
+  "children": [
+    {
+      "id": 22601,
+      "hub_id": 7,
+      "page_id": null,
+      "parent_id": 22600,
+      "model_type": null,
+      "model_id": null,
+      "hidden": 0,
+      "type": "carousel-cta",
+      "title": "Join now",
+      "label": null,
+      "settings": "{\"link\":{\"url\":\"https://example.com/join\"}}",
+      "permissions": null,
+      "meta": null,
+      "position": 0,
+      "segment_id": null
+    }
+  ],
+  "grandchildren": []
+}

@@ -1,0 +1,39 @@
+{
+  "section": {
+    "id": 20800,
+    "hub_id": 7,
+    "page_id": 100,
+    "parent_id": null,
+    "model_type": null,
+    "model_id": null,
+    "hidden": 0,
+    "type": "playlist",
+    "title": "playlist section",
+    "label": null,
+    "settings": "{}",
+    "permissions": null,
+    "meta": null,
+    "position": 0,
+    "segment_id": null
+  },
+  "children": [
+    {
+      "id": 20801,
+      "hub_id": 7,
+      "page_id": null,
+      "parent_id": 20800,
+      "model_type": null,
+      "model_id": null,
+      "hidden": 0,
+      "type": "column",
+      "title": null,
+      "label": null,
+      "settings": "{\"size\":\"1/1\"}",
+      "permissions": null,
+      "meta": null,
+      "position": 0,
+      "segment_id": null
+    }
+  ],
+  "grandchildren": []
+}

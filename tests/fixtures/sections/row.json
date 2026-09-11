@@ -1,0 +1,18 @@
+{
+  "section": {
+    "id": 11100, "hub_id": 7, "page_id": 100, "parent_id": null,
+    "model_type": null, "model_id": null, "hidden": 0, "type": "row",
+    "title": "Welcome row", "label": null,
+    "settings": "{\"background\":{\"type\":\"color\",\"color\":\"#101820\"},\"margins\":{\"top\":2}}",
+    "permissions": null, "meta": null, "position": 0, "segment_id": null
+  },
+  "children": [
+    {
+      "id": 11101, "hub_id": 7, "page_id": null, "parent_id": 11100,
+      "model_type": null, "model_id": null, "hidden": 0, "type": "column",
+      "title": null, "label": null, "settings": "{\"size\":\"1/2\"}",
+      "permissions": null, "meta": null, "position": 0, "segment_id": null
+    }
+  ],
+  "grandchildren": []
+}
