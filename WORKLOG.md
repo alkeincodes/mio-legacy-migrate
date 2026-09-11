@@ -175,3 +175,26 @@ Final verify of the run (2026-09-12 ~21:55 UTC): pages 31/31, playlists
 accepted for two reasons only: `/content` shows 0 sections on the target (V3
 renders the content page itself, so the one migrated section is ignored) and
 the authorization matrix is skipped until the two test members exist.
+
+## 2026-09-12, styling parity pass
+
+The user's bar: a member should not notice the move. The mapper now emits
+each legacy section in the catalog's own recipe shape (`mio pages catalog
+scaffold` output, vendored under `src/map/recipes/`): container + template +
+surface (padding scale from legacy pixels, background as custom hex / image /
+explicit none, per-device visibility) around a layout row of stacks whose
+width comes from the legacy column percentage. Playlist grids and strips are
+the data-bound catalog recipes with the legacy section title on top; page and
+url cards carry their picture and a styled button; headlines get weight and
+size, images show whole at their legacy width, buttons get size and a sprite
+icon. `src/map/style.ts` holds every translation.
+
+Theme: the legacy dark theme forces V3 `settings.background.type = custom`
+with `branding.background/text/header_color/header_accent`; the colour most
+legacy buttons share (#5770D1) is the V3 primary, reported as approximated.
+
+Known gaps after this pass: segment-gated rows all render under
+`--publish-held` (the home hero shows twice, one per legacy member segment);
+playlist strips are empty until `apply --assets-only` attaches items; text
+formatting inside paragraphs (bold, links, lists) is flattened because the V3
+text node shows tags literally; personalisation tokens render literally.
