@@ -22,6 +22,8 @@ export interface S3Ops {
   multipartCopy(source: CopySource, destination: CopyDestination): Promise<void>;
   abortIncompleteUploads(bucket: string, key: string): Promise<number>;
   delete(bucket: string, key: string): Promise<void>;
+  /** HeadBucket; lets check-access say which side is missing before a copy fails with a bare NoSuchBucket. */
+  bucketExists?(bucket: string): Promise<boolean>;
 }
 
 /** app/media/storage_paths.py: {team_id}/media/{media_id}/{variant}, and register-synthetic uses "original". */

@@ -58,3 +58,19 @@ theme does carry fonts (reported, not mapped). `apply --dry-run` needs no
 
 Still not run: `extract --s3-only`, `apply --check-access`, any real apply,
 `verify`. No apply has touched the target.
+
+## 2026-09-12, AWS values in: pin, map, check-access
+
+- `extract --s3-only` pinned all 1801 variants, 0 HeadObject misses; every
+  object versioned with a CRC64NVME checksum. 188 GB total, 187 GB of it video
+  (pending import in M1).
+- `map` on the pinned bundle: same 13 approximated, 0 dropped.
+- `apply --check-access`: the login as the verify user works (JWT, 900 s).
+  The probe copy failed with NoSuchBucket: `profiles/mantalks-prod.json`
+  names `mio-media-production` and `https://miocdn.membership.io`, both
+  guesses the plan flagged as unconfirmed. The real production media bucket
+  and CDN base come from the backend's `MIO_S3_BUCKET` / `MIO_CDN_BASE_URL`
+  env, not the repo; the demo team has no files yet to read a CDN host from.
+  check-access now says which bucket is missing before trying the copy.
+- Stopped there per the lead's order; `apply --dry-run` on the pinned plan
+  was not rerun (it needs no `.env` and does not depend on the bucket).

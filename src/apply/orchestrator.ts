@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { HeadBucketCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { loadEnv, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from './auth.js';
 import { loadProfile } from '../config/profile.js';
@@ -147,6 +147,14 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     async abortIncompleteUploads() { return 0; },
     async delete(bucket, key) {
       await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    },
+    async bucketExists(bucket) {
+      try {
+        await s3Client.send(new HeadBucketCommand({ Bucket: bucket }));
+        return true;
+      } catch {
+        return false;
+      }
     },
   };
 

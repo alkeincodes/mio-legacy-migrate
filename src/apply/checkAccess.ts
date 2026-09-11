@@ -25,6 +25,17 @@ export async function checkAccess(opts: {
     sizeBytes: opts.probe.sizeBytes,
   };
 
+  if (opts.s3.bucketExists) {
+    if (!(await opts.s3.bucketExists(source.bucket))) {
+      throw new Error(`the legacy bucket "${source.bucket}" (LEGACY_S3_BUCKET) does not exist or the AWS key cannot see it`);
+    }
+    if (!(await opts.s3.bucketExists(opts.bucket))) {
+      throw new Error(
+        `the V3 destination bucket "${opts.bucket}" (profiles/<name>.json "bucket") does not exist or the AWS key cannot see it; confirm the production media bucket name with the backend team`,
+      );
+    }
+  }
+
   try {
     await opts.s3.copy(source, destination);
     const head = await opts.s3.head(opts.bucket, probeKey);
