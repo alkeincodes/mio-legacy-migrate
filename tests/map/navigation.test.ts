@@ -86,3 +86,10 @@ describe('menuItemHref', () => {
     expect(menuItemHref({ link: { url: '/courses' } })).toBe('/courses');
   });
 });
+
+describe('the legacy discussions page in the menu', () => {
+  it('becomes a typed discussions item, which V3 routes to its own community page', () => {
+    const { navigation } = mapNavigation(bundle([item({ title: 'COMMUNITY', model_id: 100 })]), slugs, new Map([[100, 'discussions']]));
+    expect(navigation.header[0]).toEqual({ type: 'discussions', label: 'COMMUNITY', position: 0 });
+  });
+});

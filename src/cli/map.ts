@@ -32,7 +32,7 @@ export async function runMap(options: MapOptions): Promise<string> {
   warnings.push(...pageWarnings);
 
   const slugByPageId = new Map(pages.map((p) => [p.legacyPageId, p.slug]));
-  const { navigation, warnings: navWarnings } = mapNavigation(bundle, slugByPageId);
+  const { navigation, warnings: navWarnings } = mapNavigation(bundle, slugByPageId, new Map(bundle.pages.map((pg) => [pg.id, pg.type])));
   warnings.push(...navWarnings);
 
   const { branding, hubSettings, warnings: brandingWarnings } = mapBranding(

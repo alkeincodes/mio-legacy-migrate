@@ -34,6 +34,8 @@ export function menuItemHref(settings: Record<string, unknown>): string {
 export function mapNavigation(
   bundle: Bundle,
   slugByPageId: Map<number, string>,
+  /** Legacy page types by id; a discussions page becomes V3's typed discussions item. */
+  pageTypeById: Map<number, string> = new Map(),
 ): { navigation: PlanNavigation; warnings: PlanWarning[] } {
   const warnings: PlanWarning[] = [];
   const navigation: PlanNavigation = { header: [], footer: [], mobile: [] };
@@ -55,6 +57,10 @@ export function mapNavigation(
     }
 
     if (item.type === 'page' || item.model_type === MORPH_PAGE) {
+      if (item.model_id !== null && pageTypeById.get(item.model_id) === 'discussions') {
+        bucket.push({ type: 'discussions', label, position: bucket.length });
+        continue;
+      }
       const slug = item.model_id === null ? undefined : slugByPageId.get(item.model_id);
       if (!slug) {
         warnings.push({

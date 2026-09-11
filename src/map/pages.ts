@@ -124,6 +124,14 @@ export function mapPages(bundle: Bundle): {
   // should reach that route, not the renamed legacy copy of the page.
   const resolvePageSlug = (legacySlug: string): string =>
     RESERVED_SLUGS.has(legacySlug) ? legacySlug : (slugByLegacySlug.get(legacySlug) ?? legacySlug);
+  // By id: the built-in route for a page V3 replaces (discussions, login, register), else the migrated slug.
+  const legacySlugByPage = new Map<number, string>();
+  for (const [legacySlug, slug] of slugByLegacySlug) { const page = ordered.find((pg) => slugByPage.get(pg.id) === slug); if (page) legacySlugByPage.set(page.id, legacySlug); }
+  const routeSlugById = (legacyPageId: number): string | null => {
+    const legacySlug = legacySlugByPage.get(legacyPageId);
+    if (legacySlug && RESERVED_SLUGS.has(legacySlug)) return legacySlug;
+    return slugByPage.get(legacyPageId) ?? null;
+  };
 
   for (const page of ordered) {
     const slug = slugByPage.get(page.id) ?? slugFor(page, taken);
@@ -136,7 +144,7 @@ export function mapPages(bundle: Bundle): {
       childrenOf: (id) => (sectionsByParent.get(id) ?? []).slice().sort(byPosition),
       warn: (w) => warnings.push(w),
       resolvePageSlug,
-      pageSlugById: (legacyPageId) => slugByPage.get(legacyPageId) ?? null,
+      pageSlugById: routeSlugById,
       mediaIdForSection: (s) => (s.model_type === MORPH_FILE && s.model_id !== null ? mediaByFileId.get(s.model_id) ?? null : null),
       assetForUrl: (url) => assetByUrl.get(url) ?? null,
       mapElement: (section, ordinal) =>
@@ -151,7 +159,7 @@ export function mapPages(bundle: Bundle): {
           ],
           assetForUrl: (url) => assetByUrl.get(url) ?? null,
           resolvePageSlug,
-          pageSlugById: (legacyPageId) => slugByPage.get(legacyPageId) ?? null,
+          pageSlugById: routeSlugById,
           mediaIdForSection: (s) =>
             s.model_type === MORPH_FILE && s.model_id !== null
               ? mediaByFileId.get(s.model_id) ?? null
