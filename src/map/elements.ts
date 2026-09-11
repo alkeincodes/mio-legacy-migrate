@@ -98,7 +98,12 @@ export function mapElement(
       warnPersonalisation(doc);
       const out: Record<string, unknown> = {};
       if (typeof settings['align'] === 'string') out['align'] = settings['align'];
-      return { id, kind: 'text', value: doc ? docToHtml(doc) : content, settings: out };
+      // The V3 text node renders its value as plain text (tags show literally), so
+      // the document is flattened; bold, links and lists are lost and reported.
+      if (doc && /<(strong|em|u|a |ul|ol)/.test(docToHtml(doc))) {
+        ctx.warn({ pageSlug: ctx.pageSlug, legacySectionId: section.id, type: 'approximated', reason: 'legacy paragraph carries formatting (bold, links or a list) that the V3 text node cannot show; flattened to plain text' });
+      }
+      return { id, kind: 'text', value: doc ? docToText(doc) : content, settings: out };
     }
 
     case 'image': {

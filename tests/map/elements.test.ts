@@ -169,9 +169,9 @@ describe('real legacy content shapes', () => {
     expect(node?.settings?.['level']).toBe(3);
   });
 
-  it('text: reads the TipTap document in settings.value as HTML', () => {
+  it('text: reads the TipTap document in settings.value as plain text, because the V3 text node shows tags literally', () => {
     const section = { ...fixture('text'), label: 'Paragraph', settings: JSON.stringify({ value: doc('Weekly calls.') }) };
-    expect(mapElement(section, 2, ctx())?.value).toBe('<p>Weekly calls.</p>');
+    expect(mapElement(section, 2, ctx())?.value).toBe('Weekly calls.');
   });
 
   it('button: label from settings.link.label and a page target from the row model_id', () => {
