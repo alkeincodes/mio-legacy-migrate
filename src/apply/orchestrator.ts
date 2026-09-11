@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { HeadBucketCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { loadEnv, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from './auth.js';
 import { loadProfile } from '../config/profile.js';
@@ -20,6 +19,7 @@ import { Lock, assertLedgerClean, HEARTBEAT_INTERVAL_MS } from '../ledger/lock.j
 import { deleteOrphans, findOrphans, runAssetStage, type AssetRunner } from './assets.js';
 import { checkAccess } from './checkAccess.js';
 import { type S3Ops } from './s3.js';
+import { principalsFromEnv, s3OpsFor } from './s3Clients.js';
 import { playbackPrefilter, writePlaybackReport, type PlaybackResult } from './playbackPrefilter.js';
 import { APPLY_ORDER, shouldPublish } from './order.js';
 import {
@@ -108,62 +108,14 @@ export async function runApply(options: ApplyOptions): Promise<string> {
   const api = new ApiClient({ profile, apiKey, budget });
   const cli = new MioCli(profile);
 
-  const s3Client = new S3Client({
-    region: profile.region,
-    credentials: { accessKeyId: env.awsAccessKeyId, secretAccessKey: env.awsSecretAccessKey },
-  });
-  const s3: S3Ops = {
-    async head(bucket, key) {
-      try {
-        const out = await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: key, ChecksumMode: 'ENABLED' }));
-        return {
-          sizeBytes: out.ContentLength ?? 0,
-          etag: out.ETag ?? '',
-          versionId: out.VersionId ?? null,
-          checksumCrc64Nvme: out.ChecksumCRC64NVME ?? null,
-          contentType: out.ContentType ?? null,
-        };
-      } catch {
-        return null;
-      }
-    },
-    async copy(source, destination) {
-      const copySource = `${source.bucket}/${encodeURIComponent(source.key)}${source.versionId ? `?versionId=${source.versionId}` : ''}`;
-      await s3Client.send(new CopyObjectCommand({
-        Bucket: destination.bucket,
-        Key: destination.key,
-        CopySource: copySource,
-        ...(source.versionId ? {} : { CopySourceIfMatch: source.etag }),
-        ChecksumAlgorithm: 'CRC64NVME',
-        ContentType: destination.contentType ?? undefined,
-        MetadataDirective: 'REPLACE',
-      }));
-    },
-    async multipartCopy(source, destination) {
-      throw new Error(
-        `object ${source.bucket}/${source.key} is ${source.sizeBytes} bytes and needs a multipart copy, which is not wired up. Copy it by hand with: aws s3 cp s3://${source.bucket}/${source.key} s3://${destination.bucket}/${destination.key} --copy-props metadata-directive`,
-      );
-    },
-    async abortIncompleteUploads() { return 0; },
-    async delete(bucket, key) {
-      await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-    },
-    async bucketExists(bucket) {
-      try {
-        await s3Client.send(new HeadBucketCommand({ Bucket: bucket }));
-        return true;
-      } catch {
-        return false;
-      }
-    },
-  };
+  const s3: S3Ops = s3OpsFor(principalsFromEnv(env, profile.region), profile.bucket);
 
   if (options.checkAccess) {
     const probe = [...plan.assets]
       .filter((a) => !a.isVideo)
       .sort((a, b) => a.sizeBytes - b.sizeBytes)[0];
     if (!probe) throw new Error('the plan has no non-video asset to use as a copy probe');
-    await checkAccess({ probe, s3, api, teamId: profile.teamId, bucket: profile.bucket });
+    await checkAccess({ probe, s3, api, teamId: profile.teamId, bucket: profile.bucket, cdnBase: profile.cdnBase, cdnBaseConfirmed: profile.cdnBaseConfirmed });
     logger.info('apply --check-access passed; no mutation was attempted');
     return runId;
   }

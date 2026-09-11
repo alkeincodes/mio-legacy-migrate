@@ -2,7 +2,8 @@
   "name": "mantalks-prod",
   "apiBase": "https://api.member.dev",
   "teamId": "01a090ff-5ac3-7402-b686-66fd46af67bc",
-  "bucket": "mio-media-production",
+  "bucket": "mio-backend-assets-production",
   "region": "us-east-1",
-  "cdnBase": "https://miocdn.membership.io"
+  "cdnBase": "https://miocdn.membership.io",
+  "cdnBaseConfirmed": false
 }

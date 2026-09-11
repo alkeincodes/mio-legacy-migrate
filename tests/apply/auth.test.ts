@@ -4,7 +4,7 @@ import type { Profile } from '../../src/config/profile.js';
 
 const profile: Profile = {
   name: 'mantalks-prod', apiBase: 'https://api.example.com', teamId: 'team-1',
-  bucket: 'b', region: 'us-east-1', cdnBase: 'https://cdn.example.com',
+  bucket: 'b', region: 'us-east-1', cdnBase: 'https://cdn.example.com', cdnBaseConfirmed: true,
 };
 
 afterEach(() => { delete process.env.V3_API_KEY_MANTALKS_PROD; });

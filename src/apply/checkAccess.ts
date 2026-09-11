@@ -14,7 +14,17 @@ export async function checkAccess(opts: {
   api: ApiClient;
   teamId: string;
   bucket: string;
+  cdnBase?: string;
+  cdnBaseConfirmed?: boolean;
 }): Promise<void> {
+  if (opts.cdnBase !== undefined) {
+    logger.info(
+      opts.cdnBaseConfirmed === false
+        ? 'check-access: cdnBase is UNCONFIRMED; page trees will point migrated assets at this base, so confirm it against a real V3 media URL before a real apply'
+        : 'check-access: cdnBase in use',
+      { cdnBase: opts.cdnBase, bucket: opts.bucket },
+    );
+  }
   const probeKey = destinationKeyFor(opts.teamId, `probe-${Date.now()}`);
   const destination = { bucket: opts.bucket, key: probeKey, contentType: opts.probe.mimeType };
   const source = {

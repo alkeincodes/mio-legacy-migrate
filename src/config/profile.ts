@@ -9,6 +9,8 @@ const ProfileSchema = z.object({
   bucket: z.string().min(1),
   region: z.string().min(1),
   cdnBase: z.string().url(),
+  /** False until someone has confirmed cdnBase against a real V3 media URL; check-access prints it. */
+  cdnBaseConfirmed: z.boolean().default(true),
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;

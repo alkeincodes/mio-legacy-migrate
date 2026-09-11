@@ -16,7 +16,7 @@ import type { Profile } from '../../src/config/profile.js';
 
 const profile: Profile = {
   name: 'test', apiBase: 'https://api.example.com', teamId: 'team-1',
-  bucket: 'v3-bucket', region: 'us-east-1', cdnBase: 'https://cdn.member.dev',
+  bucket: 'v3-bucket', region: 'us-east-1', cdnBase: 'https://cdn.member.dev', cdnBaseConfirmed: true,
 };
 
 const header: LedgerHeader = {

@@ -41,6 +41,13 @@ describe('checkAccess', () => {
     ).rejects.toThrow(/legacy bucket "legacy" \(LEGACY_S3_BUCKET\)/);
   });
 
+  it('loads the committed profile with the bucket the backend team confirmed and an unconfirmed cdnBase', async () => {
+    const { loadProfile } = await import('../../src/config/profile.js');
+    const profile = loadProfile('mantalks-prod');
+    expect(profile.bucket).toBe('mio-backend-assets-production');
+    expect(profile.cdnBaseConfirmed).toBe(false);
+  });
+
   it('copies a probe, verifies it, deletes it and confirms the test members when everything exists', async () => {
     const ops = s3(() => true);
     await checkAccess({ probe, s3: ops, api, teamId: 'team-1', bucket: 'v3' });

@@ -14,6 +14,8 @@ const EnvSchema = z.object({
   AWS_ACCESS_KEY_ID: z.string().min(1),
   AWS_SECRET_ACCESS_KEY: z.string().min(1),
   AWS_REGION: z.string().min(1),
+  V3_AWS_ACCESS_KEY_ID: z.string().default(''),
+  V3_AWS_SECRET_ACCESS_KEY: z.string().default(''),
   LEGACY_S3_BUCKET: z.string().min(1),
   LEGACY_S3_URL: z.string().url(),
   LEGACY_CDN_URL: z.string().url(),
@@ -35,6 +37,9 @@ export interface Env {
   awsAccessKeyId: string;
   awsSecretAccessKey: string;
   awsRegion: string;
+  /** A separate principal for the V3 bucket; empty means fall back to the legacy pair. */
+  v3AwsAccessKeyId: string;
+  v3AwsSecretAccessKey: string;
   legacyS3Bucket: string;
   legacyS3Url: string;
   legacyCdnUrl: string;
@@ -57,6 +62,8 @@ const ALWAYS_KEYS = [
   'SSH_BOX_HOST', 'SSH_BOX_USER', 'SSH_KNOWN_HOSTS_FILE',
 ];
 const PLACEHOLDERS: Record<string, string> = {
+  V3_AWS_ACCESS_KEY_ID: '',
+  V3_AWS_SECRET_ACCESS_KEY: '',
   AWS_REGION: 'us-east-1',
   LEGACY_S3_URL: 'https://unset.invalid',
   LEGACY_CDN_URL: 'https://unset.invalid',
@@ -127,6 +134,8 @@ export function loadEnv(
     awsAccessKeyId: e.AWS_ACCESS_KEY_ID,
     awsSecretAccessKey: e.AWS_SECRET_ACCESS_KEY,
     awsRegion: e.AWS_REGION,
+    v3AwsAccessKeyId: e.V3_AWS_ACCESS_KEY_ID,
+    v3AwsSecretAccessKey: e.V3_AWS_SECRET_ACCESS_KEY,
     legacyS3Bucket: e.LEGACY_S3_BUCKET,
     legacyS3Url: e.LEGACY_S3_URL,
     legacyCdnUrl: e.LEGACY_CDN_URL,
@@ -161,6 +170,8 @@ export function secretsOf(env: Env): string[] {
     env.legacyDbPassword,
     env.awsSecretAccessKey,
     env.awsAccessKeyId,
+    env.v3AwsSecretAccessKey,
+    env.v3AwsAccessKeyId,
     env.legacyHubLoginPassword,
     env.v3VerifyLoginPassword,
     ...Object.entries(process.env)
