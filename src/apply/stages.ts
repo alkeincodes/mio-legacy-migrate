@@ -3,7 +3,8 @@ import { logger } from '../log/logger.js';
 import { recordMarker } from '../ledger/marker.js';
 import type { AssetReference, LedgerEntry } from '../ledger/schema.js';
 import type { LedgerStore } from '../ledger/store.js';
-import { contentHash, type Plan, type PlanNavigationItem, type PlanWarning } from '../map/plan.js';
+import { contentHash, type Plan, type PlanNavigationItem, type PlanPage, type PlanWarning } from '../map/plan.js';
+import { resolveHubRef } from '../map/segments.js';
 import type { CatalogNode } from '../map/catalog.js';
 import type { ApiClient } from './api.js';
 import type { EntityKind } from './contracts.js';
@@ -225,19 +226,69 @@ export async function brandingStage(ctx: StageContext): Promise<void> {
   logger.info('branding written', { keys: keys.length, settingsKeys });
 }
 
+// ---------------------------------------------------------------- tags
+
+/**
+ * A has_tag condition is compiled by slug when the segment is created, so the
+ * team tags it names must exist first. A tag whose slug is already on the team
+ * is adopted as is; one this run creates carries the marker in its description.
+ */
+export async function tagsStage(ctx: StageContext): Promise<void> {
+  for (const tag of ctx.plan.tags) {
+    await ensureRecord(ctx, {
+      legacyTable: 'tags',
+      legacyId: tag.legacyTagId,
+      kind: 'tag',
+      hash: contentHash(tag),
+      list: async (marker) => {
+        const found: string[] = [];
+        for await (const row of ctx.api.listAll<JsonApiRow>(`${team(ctx)}/tags`)) {
+          if (row.attributes?.['slug'] === tag.slug || row.attributes?.['description'] === marker) found.push(row.id);
+        }
+        return found;
+      },
+      create: async (marker) => {
+        const response = await ctx.api.post<{ data: { id: string } }>(`${team(ctx)}/tags`, {
+          data: { type: 'tags', attributes: { name: tag.name, slug: tag.slug, description: marker } },
+        });
+        return response.data.id;
+      },
+    });
+  }
+}
+
 // ---------------------------------------------------------------- segments
 
 /**
- * V3 segments need a typed condition tree (app/segments/schemas.py:801-805)
- * and no legacy-to-V3 condition mapping exists yet. M1 records every segment
- * as unmapped; each access rule that depends on one is then skipped and its
- * page stays unpublished, which is the spec's fail-closed rule.
+ * A segment whose legacy conditions all have a V3 form is created with the
+ * mapped tree (src/map/segments.ts); the hub placeholder inside it becomes the
+ * target hub id here. One with no V3 form is reported and skipped, and every
+ * access rule that depends on it is then skipped too, which is the spec's
+ * fail-closed rule.
  */
 export async function segmentsStage(ctx: StageContext): Promise<void> {
   for (const segment of ctx.plan.segments) {
-    ctx.warn(
-      `segment ${segment.legacySegmentId} "${segment.name}" was not created: legacy conditions have no V3 condition mapping in M1${segment.mappable ? '' : ' (and its conditions depend on legacy activity)'}`,
-    );
+    if (!segment.tree) {
+      ctx.warn(`segment ${segment.legacySegmentId} "${segment.name}" was not created: ${segment.unmappedReason ?? 'no V3 condition mapping'}`, 'access-unmapped');
+      continue;
+    }
+    const tree = segment.tree;
+    await ensureRecord(ctx, {
+      legacyTable: 'segments',
+      legacyId: segment.legacySegmentId,
+      kind: 'segment',
+      hash: contentHash(segment),
+      list: (m) => listByDescription(ctx, `${team(ctx)}/segments`, m),
+      create: async (m) => {
+        const response = await ctx.api.post<{ data: { id: string } }>(`${team(ctx)}/segments`, {
+          data: {
+            type: 'segment',
+            attributes: { name: segment.name, description: m, conditions: resolveHubRef(tree, ctx.hubId), is_active: true },
+          },
+        });
+        return response.data.id;
+      },
+    });
   }
 }
 
@@ -245,6 +296,13 @@ export async function segmentsStage(ctx: StageContext): Promise<void> {
 
 const SEGMENT_REF = /^ledger:\/\/segment\/(\d+)$/;
 
+/**
+ * V3 gates a page-tree node by the rule's id on the node (`access_rule_id`,
+ * app/pages/converter.py GATE_KEY) and resolves it at render by
+ * (hub, target_type node, node id). The rule has no marker field, so the ledger
+ * entry keys it by the node id it targets; adoption on resume matches the same
+ * pair on the hub's rule list. Returns the node ids that now have a rule.
+ */
 export async function accessRulesStage(ctx: StageContext): Promise<Set<string>> {
   const mapped = new Set<string>();
   for (const rule of ctx.plan.accessRules) {
@@ -258,23 +316,36 @@ export async function accessRulesStage(ctx: StageContext): Promise<Set<string>> 
       conditions.push({ condition_type: condition.condition_type, condition_data: { segment_id: segmentId }, position: condition.position });
     }
     if (unresolved) {
-      ctx.warn(`access rule for ${rule.targetKind} ${rule.targetRef} skipped: ${unresolved} has no V3 segment; the page stays unpublished`);
+      ctx.warn(`access rule for ${rule.targetKind} ${rule.targetRef} skipped: ${unresolved} has no V3 segment; the section it gates is published only under --publish-held`, 'access-unmapped');
       continue;
     }
-    await ctx.api.post(
-      `${team(ctx)}/hubs/${ctx.hubId}/access-rules`,
-      {
-        data: {
-          type: 'access_rules',
-          attributes: {
-            target_type: rule.targetKind,
-            target_id: rule.targetRef,
-            logic_operator: rule.logicOperator,
-            conditions,
+    const hash = contentHash({ target: rule.targetRef, conditions });
+    const existing = ctx.store.find(rule.targetRef);
+    if (existing?.state === 'done' && existing.v3Id) { mapped.add(rule.targetRef); continue; }
+
+    let ruleId: string | null = null;
+    for await (const row of ctx.api.listAll<JsonApiRow>(`${team(ctx)}/hubs/${ctx.hubId}/access-rules`)) {
+      if (row.attributes?.['target_type'] === rule.targetKind && row.attributes?.['target_id'] === rule.targetRef) { ruleId = row.id; break; }
+    }
+    if (!ruleId) {
+      upsertRecord(ctx.store, 'sections', rule.legacySectionId, 'accessRule', rule.targetRef, null, 'intent', ctx.runId, hash);
+      const response = await ctx.api.post<{ data: { id: string } }>(
+        `${team(ctx)}/hubs/${ctx.hubId}/access-rules`,
+        {
+          data: {
+            type: 'access_rules',
+            attributes: {
+              target_type: rule.targetKind,
+              target_id: rule.targetRef,
+              logic_operator: rule.logicOperator,
+              conditions,
+            },
           },
         },
-      },
-    );
+      );
+      ruleId = response.data.id;
+    }
+    upsertRecord(ctx.store, 'sections', rule.legacySectionId, 'accessRule', rule.targetRef, ruleId, 'done', ctx.runId, hash);
     mapped.add(rule.targetRef);
   }
   return mapped;
@@ -439,6 +510,23 @@ export function refResolverFor(ctx: StageContext): RefResolver {
   };
 }
 
+/** The tree with each restricted section carrying the id of the rule the access rules stage created for it. */
+export function withGates(ctx: StageContext, page: PlanPage, tree: CatalogNode): CatalogNode {
+  const ruleIds = new Map<string, string>();
+  for (const nodeId of page.restrictedSectionNodeIds) {
+    const entry = ctx.store.find(nodeId);
+    if (entry?.kind === 'accessRule' && entry.state === 'done' && entry.v3Id) ruleIds.set(nodeId, entry.v3Id);
+  }
+  if (ruleIds.size === 0) return tree;
+  const walk = (node: CatalogNode): CatalogNode => {
+    const ruleId = node.id ? ruleIds.get(node.id) : undefined;
+    const next: CatalogNode = ruleId ? { ...node, access_rule_id: ruleId } : { ...node };
+    if (node.children) next.children = node.children.map(walk);
+    return next;
+  };
+  return walk(tree);
+}
+
 export async function pageTreesStage(ctx: StageContext, mappedRuleTargets: Set<string>, publishHeld = false): Promise<void> {
   const resolver = refResolverFor(ctx);
   for (const page of ctx.plan.pages) {
@@ -447,7 +535,7 @@ export async function pageTreesStage(ctx: StageContext, mappedRuleTargets: Set<s
     const pageId = entry?.v3Id;
     if (!pageId) throw new Error(`page /${page.slug} has no V3 id in the ledger; the draft stage did not finish`);
 
-    const resolved = resolveRefs(page.tree, resolver);
+    const resolved = withGates(ctx, page, resolveRefs(page.tree, resolver));
     const hash = contentHash(resolved);
     const gated = !shouldPublish(page, mappedRuleTargets);
     const publish = !gated || publishHeld;
@@ -628,7 +716,7 @@ export function expectedHashesFor(ctx: StageContext): Map<string, { contentHash:
     // A draft-only entry carries the plan tree hash; a written tree carries the resolved tree hash.
     const written = entry?.referenceHash !== null && entry?.referenceHash !== undefined;
     out.set(m(page.legacyPageId), {
-      contentHash: written ? contentHash(resolveRefs(page.tree, resolver)) : contentHash(page.tree),
+      contentHash: written ? contentHash(withGates(ctx, page, resolveRefs(page.tree, resolver))) : contentHash(page.tree),
       referenceHash: undefined,
     });
   }

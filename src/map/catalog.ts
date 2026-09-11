@@ -10,6 +10,8 @@ export interface CatalogNode {
   dataSource?: { type: string; id?: string };
   repeat?: { over: 'dataSource'; limit?: number };
   system?: boolean;
+  /** Apply-time only: the V3 access rule (target_type node) gating this node; app/pages/converter.py GATE_KEY. */
+  access_rule_id?: string;
 }
 
 export interface Catalog {

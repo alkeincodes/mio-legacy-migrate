@@ -8,7 +8,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     catalogDigest: 'sha256:abc', legacyHubId: 7, sourceHost: 'replica.example.com',
     hub: { title: 'ManTalks', slug: 'mantalks', description: null, isPrivate: true },
     branding: {}, pages: [], playlists: [], folders: [], assets: [], spaces: [],
-    achievements: [], segments: [], accessRules: [],
+    achievements: [], segments: [], tags: [], accessRules: [],
     navigation: { header: [], footer: [], mobile: [] }, warnings: [],
     ...overrides,
   } as Plan;

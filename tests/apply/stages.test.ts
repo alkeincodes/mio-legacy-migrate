@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {
   accessRulesStage, achievementsStage, attachFoldersStage, foldersStage, hubStage,
   navigationItemFor, pageDraftsStage, pageTreesStage, playlistsStage, refResolverFor,
-  spacesStage, assetReferences, type StageContext,
+  segmentsStage, spacesStage, tagsStage, assetReferences, type StageContext,
 } from '../../src/apply/stages.js';
 import type { ApiClient } from '../../src/apply/api.js';
 import { LedgerStore } from '../../src/ledger/store.js';
@@ -71,7 +71,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
     legacyHubId: 7, sourceHost: 'replica.example.com',
     hub: { title: 'ManTalks', slug: 'alliance', description: null, isPrivate: true },
     branding: {}, pages: [], playlists: [], folders: [], assets: [], spaces: [],
-    achievements: [], segments: [], accessRules: [],
+    achievements: [], segments: [], tags: [], accessRules: [],
     navigation: { header: [], footer: [], mobile: [] }, warnings: [],
     ...overrides,
   };
@@ -296,7 +296,7 @@ describe('spacesStage and achievementsStage', () => {
 describe('accessRulesStage', () => {
   it('skips a rule whose segment was never created and reports it, so the page stays unpublished', async () => {
     const api = fakeApi();
-    const ctx = ctxFor(plan({ accessRules: [{ targetKind: 'section', targetRef: 'n1', logicOperator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'ledger://segment/77' }, position: 0 }] }] }), api);
+    const ctx = ctxFor(plan({ accessRules: [{ targetKind: 'node', legacySectionId: 5, targetRef: 'n1', logicOperator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'ledger://segment/77' }, position: 0 }] }] }), api);
     const mapped = await accessRulesStage(ctx);
     expect(mapped.size).toBe(0);
     expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
@@ -305,15 +305,76 @@ describe('accessRulesStage', () => {
 
   it('creates a rule with the resolved V3 segment id when the segment exists', async () => {
     const api = fakeApi();
-    const ctx = ctxFor(plan({ accessRules: [{ targetKind: 'section', targetRef: 'n1', logicOperator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'ledger://segment/77' }, position: 0 }] }] }), api);
+    const ctx = ctxFor(plan({ accessRules: [{ targetKind: 'node', legacySectionId: 5, targetRef: 'n1', logicOperator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'ledger://segment/77' }, position: 0 }] }] }), api);
     ctx.store.upsert({ legacyTable: 'segments', legacyId: 77, kind: 'segment', variant: null, marker: marker(77), v3Id: 'seg_1', state: 'done', runId: 'run-1', createdAt: 'x', updatedAt: 'x', contentHash: 'c', referenceHash: null, revisionToken: null, asset: null });
     const mapped = await accessRulesStage(ctx);
     expect([...mapped]).toEqual(['n1']);
     const create = api.calls.find((c) => c.method === 'POST')!;
+    expect(create.path).toBe('/api/v1/teams/team-1/hubs/hub_1/access-rules');
     expect((create.body as { data: { type: string; attributes: Record<string, unknown> } }).data).toMatchObject({
       type: 'access_rules',
-      attributes: { target_type: 'section', target_id: 'n1', logic_operator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'seg_1' }, position: 0 }] },
+      attributes: { target_type: 'node', target_id: 'n1', logic_operator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'seg_1' }, position: 0 }] },
     });
+    // The rule has no marker field, so the ledger keys it by the node it gates.
+    expect(ctx.store.find('n1')).toMatchObject({ kind: 'accessRule', legacyId: 5, v3Id: 'new_1', state: 'done' });
+  });
+
+  it('adopts the rule already on the hub for the same node instead of creating a second one', async () => {
+    const api = fakeApi({ lists: { '/api/v1/teams/team-1/hubs/hub_1/access-rules': [{ id: 'rule_old', attributes: { target_type: 'node', target_id: 'n1' } }] } });
+    const ctx = ctxFor(plan({ accessRules: [{ targetKind: 'node', legacySectionId: 5, targetRef: 'n1', logicOperator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'ledger://segment/77' }, position: 0 }] }] }), api);
+    ctx.store.upsert({ legacyTable: 'segments', legacyId: 77, kind: 'segment', variant: null, marker: marker(77), v3Id: 'seg_1', state: 'done', runId: 'run-1', createdAt: 'x', updatedAt: 'x', contentHash: 'c', referenceHash: null, revisionToken: null, asset: null });
+    const mapped = await accessRulesStage(ctx);
+    expect([...mapped]).toEqual(['n1']);
+    expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
+    expect(ctx.store.find('n1')?.v3Id).toBe('rule_old');
+  });
+});
+
+describe('tagsStage', () => {
+  it('creates a missing tag by slug with the marker in its description', async () => {
+    const api = fakeApi({ postId: 'tag_1' });
+    const ctx = ctxFor(plan({ tags: [{ legacyTagId: 125221, name: 'ManTalks Team', slug: 'mantalks-team' }] }), api);
+    await tagsStage(ctx);
+    const create = api.calls.find((c) => c.method === 'POST')!;
+    expect(create.path).toBe('/api/v1/teams/team-1/tags');
+    expect((create.body as { data: { attributes: Record<string, unknown> } }).data.attributes).toEqual({ name: 'ManTalks Team', slug: 'mantalks-team', description: marker(125221) });
+    expect(ctx.store.find(marker(125221))).toMatchObject({ kind: 'tag', v3Id: 'tag_1', state: 'done' });
+  });
+
+  it('adopts a tag the team already has under that slug', async () => {
+    const api = fakeApi({ lists: { '/api/v1/teams/team-1/tags': [{ id: 'tag_old', attributes: { slug: 'mantalks-team', description: null } }] } });
+    const ctx = ctxFor(plan({ tags: [{ legacyTagId: 125221, name: 'ManTalks Team', slug: 'mantalks-team' }] }), api);
+    await tagsStage(ctx);
+    expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
+    expect(ctx.store.find(marker(125221))?.v3Id).toBe('tag_old');
+  });
+});
+
+describe('segmentsStage', () => {
+  const tree = { version: 1 as const, groups: [{ logic: 'AND' as const, conditions: [{ type: 'hub_time_since_joining', operator: 'gte_days', value: { hub_id: 'ledger://hub', days: 30 } }] }] };
+
+  it('creates a mapped segment with the hub id filled in and the marker in its description', async () => {
+    const api = fakeApi({ postId: 'seg_1' });
+    const ctx = ctxFor(plan({ segments: [{ legacySegmentId: 35073, name: 'Post 30 Days', tree, tagSlugs: [], mappable: true, unmappedReason: null }] }), api);
+    await segmentsStage(ctx);
+    const create = api.calls.find((c) => c.method === 'POST')!;
+    expect(create.path).toBe('/api/v1/teams/team-1/segments');
+    expect((create.body as { data: { type: string; attributes: Record<string, unknown> } }).data).toEqual({
+      type: 'segment',
+      attributes: {
+        name: 'Post 30 Days', description: marker(35073), is_active: true,
+        conditions: { version: 1, groups: [{ logic: 'AND', conditions: [{ type: 'hub_time_since_joining', operator: 'gte_days', value: { hub_id: 'hub_1', days: 30 } }] }] },
+      },
+    });
+    expect(ctx.store.find(marker(35073))).toMatchObject({ kind: 'segment', v3Id: 'seg_1', state: 'done' });
+  });
+
+  it('skips an unmapped segment and says why', async () => {
+    const api = fakeApi();
+    const ctx = ctxFor(plan({ segments: [{ legacySegmentId: 34756, name: 'Leading Yourself', tree: null, tagSlugs: [], mappable: false, unmappedReason: '31986 (attribute_multiple, equals) has no V3 condition mapping' }] }), api);
+    await segmentsStage(ctx);
+    expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
+    expect(ctx.warnings[0]).toContain('attribute_multiple');
   });
 });
 
@@ -350,8 +411,8 @@ describe('pageTreesStage with --publish-held', () => {
   };
   const p = plan({
     pages: [gatedPage],
-    segments: [{ legacySegmentId: 77, name: 'Paid members', conditions: [], mappable: true }],
-    accessRules: [{ targetKind: 'section', targetRef: 'n1', logicOperator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'ledger://segment/77' }, position: 0 }] }],
+    segments: [{ legacySegmentId: 77, name: 'Paid members', tree: null, tagSlugs: [], mappable: false, unmappedReason: 'test' }],
+    accessRules: [{ targetKind: 'node', legacySectionId: 5, targetRef: 'n1', logicOperator: 'any', conditions: [{ condition_type: 'in_segment', condition_data: { segment_id: 'ledger://segment/77' }, position: 0 }] }],
   });
 
   it('publishes the held page, records published-ungated with the legacy segment names, and warns', async () => {
@@ -364,6 +425,21 @@ describe('pageTreesStage with --publish-held', () => {
     expect(ctx.publishedUngated).toEqual([{ slug: 'training', legacySegments: ['Paid members'] }]);
     expect(ctx.store.find(marker(100))?.referenceHash).toBe('published-ungated');
     expect(ctx.warnings.some((w) => w.includes('UNGATED') && w.includes('Paid members'))).toBe(true);
+  });
+
+  it('stamps the mapped rule id on the gated section and publishes the page gated, not held open', async () => {
+    const api = fakeApi({ postId: 'pg_1', gets: { '/api/v1/teams/team-1/hubs/hub_1/pages/pg_1': { body: { data: { attributes: { draft_version: 1 } } } } } });
+    const ctx = ctxFor(p, api);
+    ctx.publishedUngated = [];
+    ctx.store.upsert({ legacyTable: 'sections', legacyId: 5, kind: 'accessRule', variant: null, marker: 'n1', v3Id: 'rule_1', state: 'done', runId: 'run-1', createdAt: 'x', updatedAt: 'x', contentHash: 'c', referenceHash: null, revisionToken: null, asset: null });
+    await pageDraftsStage(ctx);
+    await pageTreesStage(ctx, new Set(['n1']), true);
+    const put = api.calls.find((c) => c.method === 'PUT')!;
+    const root = (put.body as { data: { attributes: { tree: { root: { children: Array<{ id: string; access_rule_id?: string }> } } } } }).data.attributes.tree.root;
+    expect(root.children[0]).toMatchObject({ id: 'n1', access_rule_id: 'rule_1' });
+    expect(api.calls.some((c) => c.path.endsWith('/publish'))).toBe(true);
+    expect(ctx.publishedUngated).toEqual([]);
+    expect(ctx.store.find(marker(100))?.referenceHash).toBe('published');
   });
 
   it('still holds the page without the flag', async () => {

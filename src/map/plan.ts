@@ -72,15 +72,28 @@ export interface PlanAchievement {
   isActive: boolean;
 }
 
+/** A V3 segment condition tree: OR of AND groups (app/segments/schemas.py ConditionTreeIn). */
+export interface PlanSegmentCondition { type: string; operator: string; value: Record<string, unknown> }
+export interface PlanSegmentTree { version: 1; groups: Array<{ logic: 'AND'; conditions: PlanSegmentCondition[] }> }
+
 export interface PlanSegment {
   legacySegmentId: number;
   name: string;
-  conditions: unknown;
+  /** The V3 condition tree, or null when a legacy condition has no V3 equivalent. `ledger://hub` inside it is the target hub id. */
+  tree: PlanSegmentTree | null;
+  /** V3 tag slugs the tree's has_tag conditions need; the tags stage creates them first. */
+  tagSlugs: string[];
   mappable: boolean;
+  unmappedReason: string | null;
 }
 
+/** A team tag a segment condition names; created by slug before the segment. */
+export interface PlanTag { legacyTagId: number; name: string; slug: string }
+
 export interface PlanAccessRule {
-  targetKind: 'section' | 'content_node';
+  /** `node` gates a page-tree node: the rule is created with target_type node and its id rides on the node as access_rule_id. */
+  targetKind: 'node' | 'content_node';
+  legacySectionId: number;
   targetRef: string;
   logicOperator: 'any' | 'all';
   conditions: Array<{ condition_type: 'has_entitlement' | 'in_segment' | 'past_drip_date'; condition_data: Record<string, unknown>; position: number }>;
@@ -124,6 +137,7 @@ export interface Plan {
   spaces: PlanSpace[];
   achievements: PlanAchievement[];
   segments: PlanSegment[];
+  tags: PlanTag[];
   accessRules: PlanAccessRule[];
   navigation: PlanNavigation;
   warnings: PlanWarning[];

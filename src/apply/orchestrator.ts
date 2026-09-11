@@ -24,7 +24,7 @@ import { playbackPrefilter, writePlaybackReport, type PlaybackResult } from './p
 import { APPLY_ORDER, shouldPublish } from './order.js';
 import {
   accessRulesStage, achievementsStage, assetReferences, attachFoldersStage, brandingStage, doneEntriesDiffering, foldersStage, hubStage, legacySegmentsGating,
-  navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, segmentsStage, spacesStage,
+  navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, segmentsStage, tagsStage, spacesStage,
   type StageContext,
 } from './stages.js';
 import type { LedgerHeader } from '../ledger/schema.js';
@@ -56,7 +56,7 @@ export interface ApplyOptions {
 /** Every entity kind apply may touch, checked against docs/contracts.md at startup. */
 const MUTATED_ENTITIES: EntityKind[] = [
   'hub', 'page', 'playlist', 'folder', 'asset', 'space', 'achievement', 'segment',
-  'accessRule', 'navigation',
+  'tag', 'accessRule', 'navigation',
 ];
 
 export async function runApply(options: ApplyOptions): Promise<string> {
@@ -268,6 +268,9 @@ export async function runApply(options: ApplyOptions): Promise<string> {
         case 'branding':
           await brandingStage(ctx);
           break;
+        case 'tags':
+          await tagsStage(ctx);
+          break;
         case 'segments':
           await segmentsStage(ctx);
           break;
@@ -357,17 +360,29 @@ function planOperations(plan: Plan, mode: { skipAssets: boolean; linkable?: Set<
   let order = 0;
   operations.push({ order: order++, kind: 'hub.create', summary: `create hub "${plan.hub.title}" at slug ${plan.hub.slug}`, detail: { slug: plan.hub.slug } });
   operations.push({ order: order++, kind: 'hub.branding', summary: `write ${Object.keys(plan.branding).length} branding keys`, detail: plan.branding });
-  for (const segment of plan.segments) {
-    operations.push({ order: order++, kind: 'segment.skip', summary: `skip segment "${segment.name}": no V3 condition mapping in M1`, detail: { legacySegmentId: segment.legacySegmentId } });
+  for (const tag of plan.tags) {
+    operations.push({ order: order++, kind: 'tag.create', summary: `create or adopt tag "${tag.name}" (${tag.slug})`, detail: { legacyTagId: tag.legacyTagId } });
   }
-  // Every M1 rule is in_segment, and no segment is created, so no rule maps and its page holds.
+  const createdSegments = new Set<number>();
+  for (const segment of plan.segments) {
+    if (segment.tree) {
+      createdSegments.add(segment.legacySegmentId);
+      operations.push({ order: order++, kind: 'segment.create', summary: `create segment "${segment.name}" with ${segment.tree.groups.length} group${segment.tree.groups.length === 1 ? '' : 's'}`, detail: { legacySegmentId: segment.legacySegmentId } });
+    } else {
+      operations.push({ order: order++, kind: 'segment.skip', summary: `skip segment "${segment.name}": ${segment.unmappedReason ?? 'no V3 condition mapping'}`, detail: { legacySegmentId: segment.legacySegmentId } });
+    }
+  }
+  // A rule maps when every segment it names is created; otherwise its page holds (or publishes ungated).
   const mappedTargets = new Set<string>();
   for (const rule of plan.accessRules) {
-    const needsSegment = rule.conditions.some((c) => c.condition_type === 'in_segment');
-    if (needsSegment) {
-      operations.push({ order: order++, kind: 'accessRule.skip', summary: `skip the gate on ${rule.targetKind} ${rule.targetRef}: its segment is not created in M1`, detail: { conditions: rule.conditions.length } });
+    const missing = rule.conditions
+      .filter((c) => c.condition_type === 'in_segment')
+      .map((c) => Number(/^ledger:\/\/segment\/(\d+)$/.exec(String(c.condition_data['segment_id'] ?? ''))?.[1] ?? NaN))
+      .filter((id) => !createdSegments.has(id));
+    if (missing.length > 0) {
+      operations.push({ order: order++, kind: 'accessRule.skip', summary: `skip the gate on ${rule.targetKind} ${rule.targetRef}: legacy segment ${missing.join(', ')} is not created`, detail: { conditions: rule.conditions.length } });
     } else {
-      operations.push({ order: order++, kind: 'accessRule.create', summary: `gate ${rule.targetKind} ${rule.targetRef}`, detail: { conditions: rule.conditions.length } });
+      operations.push({ order: order++, kind: 'accessRule.create', summary: `gate ${rule.targetKind} ${rule.targetRef} (target_type node, id stamped on the section)`, detail: { conditions: rule.conditions.length } });
       mappedTargets.add(rule.targetRef);
     }
   }

@@ -198,3 +198,34 @@ Known gaps after this pass: segment-gated rows all render under
 playlist strips are empty until `apply --assets-only` attaches items; text
 formatting inside paragraphs (bold, links, lists) is flattened because the V3
 text node shows tags literally; personalisation tokens render literally.
+
+## 2026-09-12 (later): segment gating and button icons
+
+The user asked why the home hero renders twice and why the "5-Day Challenge"
+button lost its icon. Cause of the first: the legacy home page carries four
+hero rows, a desktop and a mobile one for each of the "Post 30 Days" and "First
+30 Days" audience segments, and V3 segments were never created, so
+`--publish-held` published every row open. Cause of the second: the legacy
+glyph `target` is not in the hub sprite and the icon map dropped it.
+
+Fix. `src/map/segments.ts` flattens a legacy segment's and/or tree to the V3
+OR-of-AND form and maps `date_registered less_than|more_than N` to
+`hub_time_since_joining lte_days|gte_days N` and `tags equals|not_equals` to
+`has_tag has|has_not` by slug. A new `tags` stage creates or adopts the team
+tags a segment names. The access rules stage now creates rules with
+`target_type: node` (the renderer resolves a gate by hub, node, node id; the
+old `section` target never matched) and the page tree stage stamps the rule id
+on the section as `access_rule_id`. Attribute-based segments (the three
+pathways and "No Profile Details") stay unmapped because attribute definitions
+are not extracted; they gate only the archived home page. The icon map gains
+the nearest sprite for every legacy glyph the hub uses (target to
+star-circle, circle-right to circle-arrow-right, and so on).
+
+Dry run of the new plan (`plans/hub-38827-60cc252c7a3c.json`): 3 tags, 5
+segments, 12 rules, 30 pages published gated, 1 published ungated (Home -
+Archived). Not applied yet; needs the lead's go for
+`apply --resume run-2026-09-11T19-49-29-036Z-b3f055c6 --accept-plan-change
+--rewrite-pages --skip-assets --publish-held --hub-slug alliance --profile
+mantalks-prod`. Note for verify: the hub member alkein@membership.io joined
+under 30 days ago, so after the apply they see the "First 30 Days" hero
+(Start Here), not the "Post 30 Days" one the user called correct.

@@ -39,7 +39,10 @@ describe('style translation', () => {
   it('keeps a trailing icon only when the sprite has it', () => {
     const s = buttonSettingsFor({ button: { icon: { show: true, alignment: 'right', illustration: { icon: 'chat' } } } }, { type: 'url', value: 'https://x' }, false);
     expect(s).toMatchObject({ size: 'lg', iconRight: 'chat', variant: 'primary' });
-    expect(buttonSettingsFor({ button: { icon: { show: true, alignment: 'right', illustration: { icon: 'target' } } } }, { type: 'url', value: 'https://x' }, false)).not.toHaveProperty('iconRight');
+    // The sprite has no target glyph, so the nearest one stands in rather than the button losing its icon.
+    expect(buttonSettingsFor({ button: { icon: { show: true, alignment: 'right', illustration: { icon: 'target' } } } }, { type: 'url', value: 'https://x' }, false)).toMatchObject({ iconRight: 'star-circle' });
+    expect(buttonSettingsFor({ button: { icon: { show: true, alignment: 'right', illustration: { icon: 'circle-right' } } } }, { type: 'url', value: 'https://x' }, false)).toMatchObject({ iconRight: 'circle-arrow-right' });
+    expect(buttonSettingsFor({ button: { icon: { show: true, alignment: 'right', illustration: { icon: 'easter-2' } } } }, { type: 'url', value: 'https://x' }, false)).not.toHaveProperty('iconRight');
   });
 
   it('finds the button colour most of the hub uses, or nothing when buttons disagree', () => {

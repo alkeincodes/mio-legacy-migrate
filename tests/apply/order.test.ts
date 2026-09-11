@@ -5,6 +5,7 @@ import type { CatalogNode } from '../../src/map/catalog.js';
 
 describe('APPLY_ORDER', () => {
   it('puts segments and access rules before anything that attaches to them', () => {
+    expect(APPLY_ORDER.indexOf('tags')).toBeLessThan(APPLY_ORDER.indexOf('segments'));
     expect(APPLY_ORDER.indexOf('segments')).toBeLessThan(APPLY_ORDER.indexOf('assets'));
     expect(APPLY_ORDER.indexOf('accessRules')).toBeLessThan(APPLY_ORDER.indexOf('playlists'));
     expect(APPLY_ORDER.indexOf('accessRules')).toBeLessThan(APPLY_ORDER.indexOf('pageTrees'));

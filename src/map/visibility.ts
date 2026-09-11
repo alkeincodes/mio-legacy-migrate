@@ -1,6 +1,4 @@
-import type {
-  LegacySection, LegacySegment, LegacySegmentCondition, LegacySegmentable,
-} from '../extract/queries.js';
+import type { LegacySection, LegacySegment, LegacySegmentable } from '../extract/queries.js';
 import { MORPH_SECTION } from '../extract/queries.js';
 import type { PlanAccessRule } from './plan.js';
 
@@ -12,21 +10,6 @@ export interface GateResolution {
 
 export function segmentRef(legacySegmentId: number): string {
   return `ledger://segment/${legacySegmentId}`;
-}
-
-/**
- * V3 expresses only has_entitlement, in_segment and past_drip_date. A legacy
- * segment built on hub file or playlist activity has no V3 equivalent, so the
- * section stays restricted with no rule and the run reports access-unmapped.
- */
-const UNPORTABLE_CONDITION_TYPES = new Set(['hub_file_activity', 'hub_playlist_activity']);
-
-export function isSegmentMappable(
-  _segment: LegacySegment,
-  conditions: LegacySegmentCondition[],
-): boolean {
-  if (conditions.length === 0) return false;
-  return conditions.every((c) => !UNPORTABLE_CONDITION_TYPES.has(c.type));
 }
 
 export function resolveGate(input: {
@@ -71,7 +54,8 @@ export function resolveGate(input: {
     restricted: true,
     unmappedReason: null,
     rule: {
-      targetKind: 'section',
+      targetKind: 'node',
+      legacySectionId: section.id,
       targetRef: sectionNodeId,
       logicOperator: 'any',
       conditions: [...gateIds].sort((a, b) => a - b).map((id, position) => ({

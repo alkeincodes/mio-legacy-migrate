@@ -32,7 +32,7 @@ function plan(): Plan {
       },
     ],
     playlists: [], folders: [], assets: [], spaces: [], achievements: [],
-    segments: [], accessRules: [],
+    segments: [], tags: [], accessRules: [],
     navigation: { header: [], footer: [], mobile: [] },
     warnings: [
       { pageSlug: 'about', legacySectionId: 1, type: 'approximated', reason: 'cta' },

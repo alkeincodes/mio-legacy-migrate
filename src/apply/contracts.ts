@@ -9,6 +9,7 @@ export type EntityKind =
   | 'space'
   | 'achievement'
   | 'segment'
+  | 'tag'
   | 'accessRule'
   | 'navigation';
 
@@ -21,6 +22,7 @@ const ENTITY_KINDS = new Set<string>([
   'space',
   'achievement',
   'segment',
+  'tag',
   'accessRule',
   'navigation',
 ]);

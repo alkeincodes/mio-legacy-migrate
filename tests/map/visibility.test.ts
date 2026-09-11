@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isSegmentMappable, resolveGate } from '../../src/map/visibility.js';
-import type { LegacySection, LegacySegment, LegacySegmentCondition, LegacySegmentable } from '../../src/extract/queries.js';
+import { resolveGate } from '../../src/map/visibility.js';
+import type { LegacySection, LegacySegment, LegacySegmentable } from '../../src/extract/queries.js';
 
 const section: LegacySection = {
   id: 11100, hub_id: 7, page_id: 100, parent_id: null, model_type: null,
@@ -20,7 +20,7 @@ describe('resolveGate', () => {
     });
   });
 
-  it('maps a segment_id gate to an in_segment access rule against the section node', () => {
+  it('maps a segment_id gate to an in_segment access rule against the section node, created as a node target', () => {
     const result = resolveGate({
       section: { ...section, segment_id: 77 },
       segmentables: [],
@@ -29,7 +29,8 @@ describe('resolveGate', () => {
     });
     expect(result.restricted).toBe(true);
     expect(result.rule).toEqual({
-      targetKind: 'section',
+      targetKind: 'node',
+      legacySectionId: 11100,
       targetRef: 'n1',
       logicOperator: 'any',
       conditions: [
@@ -79,25 +80,5 @@ describe('resolveGate', () => {
     expect(result.restricted).toBe(true);
     expect(result.rule).toBeNull();
     expect(result.unmappedReason).toContain('permissions');
-  });
-});
-
-describe('isSegmentMappable', () => {
-  it('accepts a segment whose conditions are all attribute or tag based', () => {
-    const conditions: LegacySegmentCondition[] = [
-      { id: 1, segment_id: 77, segment_group_id: 1, condition: 'tag', operator: 'is', value: 'vip', type: 'tag', tag_id: 3 },
-    ];
-    expect(isSegmentMappable(segment, conditions)).toBe(true);
-  });
-
-  it('rejects a segment that depends on legacy file activity, which V3 cannot express', () => {
-    const conditions: LegacySegmentCondition[] = [
-      { id: 1, segment_id: 77, segment_group_id: 1, condition: 'watched', operator: 'is', value: '5', type: 'hub_file_activity', tag_id: null },
-    ];
-    expect(isSegmentMappable(segment, conditions)).toBe(false);
-  });
-
-  it('rejects a segment with no conditions at all', () => {
-    expect(isSegmentMappable(segment, [])).toBe(false);
   });
 });

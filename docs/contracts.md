@@ -23,7 +23,8 @@ header the route accepts, if any.
 | space | `POST /api/v1/admin/teams/{team_id}/hubs/{hub_id}/spaces/` (`mio community spaces create`) | `description` | field | `GET .../spaces/` paginated, filter client-side | none | none | yes |
 | achievement | `POST /api/v1/teams/{team_id}/achievements` (`mio achievements create`) | `description` | field | `GET /api/v1/teams/{team_id}/achievements` paginated, filter client-side | none | none | yes |
 | segment | `POST /api/v1/teams/{team_id}/segments` (`mio segments create`) | `description` (max 2000 chars) | field | `GET /api/v1/teams/{team_id}/segments` paginated, filter client-side | none exposed. `segments.definition_version` exists in the DB but is absent from the read schema and rejected on write by `_ForbidExtra` | none | yes |
-| accessRule | `POST /api/v1/teams/{team_id}/hubs/{hub_id}/access-rules` (`mio access-rules rules create`) | none | none | `GET .../access-rules` paginated, match on `target_type` plus `target_id`, both of which the ledger already resolves | none | none | yes |
+| tag | `POST /api/v1/teams/{team_id}/tags` (`mio tags create`) | `description` (max 1000 chars) | field | `GET /api/v1/teams/{team_id}/tags` paginated, match on `attributes.slug` first (a tag the team already has under that slug is adopted as is), then on the description marker | none | none | yes |
+| accessRule | `POST /api/v1/teams/{team_id}/hubs/{hub_id}/access-rules` with `target_type: node` and `target_id: <page-tree node id>` | none | none | `GET .../access-rules` paginated, match on `target_type` plus `target_id`; the ledger keys the entry by the node id it gates | none | none | yes |
 | navigation | `PATCH /api/v1/teams/{team_id}/hubs/{identifier}` with `attributes.navigation` (there is no navigation endpoint) | none | none | read `attributes.navigation` back from `GET .../hubs/{identifier}`; the blob is written wholesale so it is idempotent by construction | the hub `ETag` | none | yes |
 
 ## Known limits recorded here on purpose
@@ -61,18 +62,40 @@ header the route accepts, if any.
   `condition_type`. Apply sends only the three documented condition types
   (`has_entitlement`, `in_segment`, `past_drip_date`) with their documented
   shapes.
-- **Segments are not created in M1.** `POST /api/v1/teams/{team_id}/segments`
-  demands a typed condition tree (`conditions.version: 1`, `groups[].logic:
-  "AND"`, discriminated condition members, `app/segments/schemas.py:801-805`)
-  and no legacy-to-V3 condition mapping exists yet. The segments stage records
-  each legacy segment as unmapped; every access rule that depends on one is
-  skipped, and the page that rule would have gated stays unpublished.
+- **Segments are created only for the legacy condition types that have a V3
+  form.** `POST /api/v1/teams/{team_id}/segments` takes a typed tree
+  (`conditions.version: 1`, an OR of `groups[].logic: "AND"`,
+  `app/segments/schemas.py`), and `src/map/segments.ts` flattens the legacy
+  and/or tree to that form. Mapped so far: `date_registered less_than N` to
+  `hub_time_since_joining lte_days N` and `more_than N` to `gte_days N` (legacy
+  counts days since the contact registered, searchie `CreatedAtResolver`; V3
+  counts days since the contact joined this hub, the closest rolling form it
+  has), and `tags equals|not_equals <name>` to `has_tag has|has_not` by slug.
+  A tag is created on the team first (`tags` stage) because the segment compiles
+  the slug at create time. Attribute conditions (`attribute_multiple` and
+  friends) are not mapped: the legacy attribute definitions are not extracted.
+  An unmapped segment is reported, every access rule depending on it is skipped,
+  and its page publishes only under `--publish-held`.
+- **A page-tree gate is the rule id on the node.** The published renderer reads
+  `access_rule_id` off a section node (`app/pages/converter.py` GATE_KEY) and
+  resolves the rule by `(hub, target_type "node", node id)`; publish refuses a
+  node whose rule id does not exist (`unknown_access_rule`). Apply therefore
+  creates each rule with `target_type: node` before any tree is written and
+  stamps the id on the section when it writes the tree. A section gated by an
+  unmapped segment gets no id and is open to every member.
 - **Navigation url items store root-relative hrefs only**
   (`app/hubs/validation.py:329-354`). A same-origin legacy link is rewritten to
   its path; an off-site link is dropped with a run warning.
 - **The folder marker rides in the name** as ` [lgc:...]`, because folders
   have no free-text column. Adoption matches on that suffix.
-- **Achievements and segments require `Content-Type: application/vnd.api+json`**
+- **Button icons are hub sprite ids** (`mio-hub/public/icons/sprite.svg`), and
+  the legacy glyph set is larger. `BUTTON_ICONS` in `src/map/style.ts` maps
+  same-glyph names directly and the rest to the nearest sprite (target to
+  star-circle, trophy to star, friend to user-plus, book to content, rocket to
+  arrow-right-up, handshake to users-multiple, script to file-text, note to
+  write, check-mark to tick, boxing to activity); a glyph outside the map drops
+  the icon.
+- **Achievements, tags and segments require `Content-Type: application/vnd.api+json`**
   (`require_jsonapi_content_type`); the client sends it on every write.
 - **Reserved page slugs.** `POST .../pages/` answers 422 `page_slug_reserved`
   for a slug that collides with a built-in route

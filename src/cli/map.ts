@@ -6,9 +6,9 @@ import { mapBranding } from '../map/branding.js';
 import { dominantButtonColour } from '../map/style.js';
 import { mapNavigation } from '../map/navigation.js';
 import { mapPages } from '../map/pages.js';
-import { isSegmentMappable } from '../map/visibility.js';
+import { mapSegment } from '../map/segments.js';
 import { SECTION_TABLE } from '../map/sectionTable.js';
-import { writePlan, type Plan, type PlanWarning } from '../map/plan.js';
+import { writePlan, type Plan, type PlanSegment, type PlanTag, type PlanWarning } from '../map/plan.js';
 import { MORPH_HUB } from '../extract/queries.js';
 
 /** The V3 slug: the legacy custom subdomain when set, else the first label of the legacy domain. */
@@ -62,6 +62,22 @@ export async function runMap(options: MapOptions): Promise<string> {
       condition,
     ]);
   }
+  const tags = new Map<string, PlanTag>();
+  const segments: PlanSegment[] = bundle.segments.map((s) => {
+    const mapped = mapSegment(s, bundle.segmentGroups.filter((g) => g.segment_id === s.id), conditionsBySegment.get(s.id) ?? []);
+    for (const tag of mapped.tags) tags.set(tag.slug, tag);
+    if (mapped.unmappedReason) {
+      warnings.push({ pageSlug: null, legacySectionId: null, type: 'access-unmapped', reason: `segment ${s.id} "${s.title}" is not created: ${mapped.unmappedReason}` });
+    }
+    return {
+      legacySegmentId: s.id,
+      name: s.title,
+      tree: mapped.tree,
+      tagSlugs: mapped.tags.map((t) => t.slug),
+      mappable: mapped.tree !== null,
+      unmappedReason: mapped.unmappedReason,
+    };
+  });
 
   const plan: Plan = {
     planVersion: 1,
@@ -126,12 +142,8 @@ export async function runMap(options: MapOptions): Promise<string> {
       description: a.description,
       isActive: a.enabled === 1,
     })),
-    segments: bundle.segments.map((s) => ({
-      legacySegmentId: s.id,
-      name: s.title,
-      conditions: conditionsBySegment.get(s.id) ?? [],
-      mappable: isSegmentMappable(s, conditionsBySegment.get(s.id) ?? []),
-    })),
+    segments,
+    tags: [...tags.values()].sort((a, b) => a.slug.localeCompare(b.slug)),
     accessRules,
     navigation,
     warnings,

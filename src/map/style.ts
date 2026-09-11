@@ -129,11 +129,19 @@ export function imageSettingsFor(settings: Record<string, unknown>, alt: string)
   return out;
 }
 
-/** Sprite ids verified present in the hub icon set (mio skill); anything else is dropped. */
-const BUTTON_ICONS: Record<string, string> = {
-  chat: 'chat', play: 'play', video: 'video', calendar: 'calendar', download: 'download',
+/**
+ * Legacy button glyphs to hub sprite ids (mio-hub public/icons/sprite.svg). The
+ * first block is the same glyph; the second is the nearest the sprite has,
+ * because the legacy set (target, trophy, rocket, handshake...) is larger.
+ * Anything not listed is dropped.
+ */
+export const BUTTON_ICONS: Record<string, string> = {
+  chat: 'chat', play: 'play', video: 'video', 'video-camera': 'video-camera', calendar: 'calendar', download: 'download',
   search: 'search', star: 'star', link: 'link', users: 'users', heart: 'heart', email: 'email',
-  'circle-right': 'arrow-right', caret: 'chevron-right', 'arrow-right': 'arrow-right',
+  'arrow-right': 'arrow-right', 'circle-right': 'circle-arrow-right',
+  caret: 'chevron-right', target: 'star-circle', book: 'content', 'user-2': 'users', friend: 'user-plus',
+  rocket: 'arrow-right-up', trophy: 'star', note: 'write', 'check-mark': 'tick', boxing: 'activity',
+  handshake: 'users-multiple', script: 'file-text', 'easter-1': 'star',
 };
 
 export function buttonSettingsFor(settings: Record<string, unknown>, action: { type: string; value: string }, newTab: boolean): Record<string, unknown> {
