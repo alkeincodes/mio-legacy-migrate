@@ -7,7 +7,7 @@ import { contentHash, readPlan } from '../map/plan.js';
 import { LedgerStore, ledgerDir } from '../ledger/store.js';
 import { Budget, budgetIdentity } from '../apply/budget.js';
 import { ApiClient } from '../apply/api.js';
-import { buildStructuralReport, renderReportMarkdown, writeReport, type LiveCounts } from '../verify/report.js';
+import { buildStructuralReport, publishedRootOf, renderReportMarkdown, writeReport, type LiveCounts } from '../verify/report.js';
 import { captureContactSheet, runBrowserPlaybackChecks } from '../verify/browser.js';
 import { runAuthorizationChecks, type AuthzTarget, type Principal } from '../verify/authz.js';
 import { evaluateAcceptance, type AcceptanceVerdict } from '../verify/acceptance.js';
@@ -38,15 +38,20 @@ export async function runVerify(opts: {
   for await (const row of api.listAll<{ attributes: { slug: string } }>(
     `/api/v1/teams/${profile.teamId}/hubs/${hubId}/pages/`,
   )) {
-    const tree = await api.get<{ data: { attributes: { tree: unknown } } }>(
-      `/api/v1/teams/${profile.teamId}/hubs/${hubId}/pages/${row.attributes.slug}?resolve=false`,
-    );
-    const publishedTree = tree.body.data.attributes.tree as { children?: unknown[] } | null;
-    const sections = publishedTree?.children ?? [];
+    // A page with no published tree answers 404 here; that is a real finding, not a crash.
+    let publishedRoot = null as ReturnType<typeof publishedRootOf>;
+    try {
+      const tree = await api.get<unknown>(
+        `/api/v1/teams/${profile.teamId}/hubs/${hubId}/pages/${row.attributes.slug}?resolve=false`,
+      );
+      publishedRoot = publishedRootOf(tree.body);
+    } catch (error) {
+      logger.warn('no published tree readable for a page', { slug: row.attributes.slug, error: error instanceof Error ? error.message.slice(0, 120) : String(error) });
+    }
     livePages.push({
       slug: row.attributes.slug,
-      sectionCount: sections.length,
-      publishedTreeDigest: publishedTree === null ? null : contentHash(publishedTree),
+      sectionCount: publishedRoot?.children?.length ?? 0,
+      publishedTreeDigest: publishedRoot === null ? null : contentHash(publishedRoot),
     });
   }
 

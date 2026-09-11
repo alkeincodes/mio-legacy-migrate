@@ -170,3 +170,15 @@ export function writeReport(markdown: string, runDir: string): string {
   writeFileSync(path, markdown, 'utf8');
   return path;
 }
+
+/**
+ * The root node of a published tree as GET .../pages/{id}?resolve=false returns
+ * it: `data.attributes.tree` is `{ root: node }`. Null when the page has no
+ * published tree or the body is not a page_trees resource.
+ */
+export function publishedRootOf(body: unknown): CatalogNode | null {
+  const tree = (body as { data?: { attributes?: { tree?: unknown } } } | null)?.data?.attributes?.tree;
+  if (!tree || typeof tree !== 'object') return null;
+  const root = (tree as { root?: unknown }).root ?? tree;
+  return root && typeof root === 'object' && 'kind' in (root as object) ? (root as CatalogNode) : null;
+}

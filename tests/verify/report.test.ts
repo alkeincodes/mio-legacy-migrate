@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildStructuralReport, renderReportMarkdown } from '../../src/verify/report.js';
+import { buildStructuralReport, publishedRootOf, renderReportMarkdown } from '../../src/verify/report.js';
 import { LedgerStore } from '../../src/ledger/store.js';
 import { contentHash, type Plan } from '../../src/map/plan.js';
 import type { LedgerHeader } from '../../src/ledger/schema.js';
@@ -156,5 +156,17 @@ describe('renderReportMarkdown', () => {
       live: { pages: [{ slug: 'about', sectionCount: 1, publishedTreeDigest: null }], playlists: 0, folders: 0, files: 0 },
     });
     expect(renderReportMarkdown(report, p)).toContain('Signed off by:');
+  });
+});
+
+describe('publishedRootOf', () => {
+  it('unwraps the {root} envelope the resolve=false read returns', () => {
+    const root = { id: 'r', kind: 'stack', children: [{ id: 'a', kind: 'container', template: 'row', children: [] }] };
+    expect(publishedRootOf({ data: { attributes: { tree: { root } } } })).toEqual(root);
+  });
+
+  it('returns null for a page with no published tree or a non-tree body', () => {
+    expect(publishedRootOf({ data: { attributes: { slug: 'x' } } })).toBeNull();
+    expect(publishedRootOf(null)).toBeNull();
   });
 });
