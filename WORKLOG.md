@@ -74,3 +74,17 @@ Still not run: `extract --s3-only`, `apply --check-access`, any real apply,
   check-access now says which bucket is missing before trying the copy.
 - Stopped there per the lead's order; `apply --dry-run` on the pinned plan
   was not rerun (it needs no `.env` and does not depend on the bucket).
+
+## 2026-09-12, V3 bucket confirmed
+
+- `profiles/mantalks-prod.json` bucket is `mio-backend-assets-production`
+  (confirmed by the backend team); `cdnBaseConfirmed: false` until someone
+  checks `https://miocdn.membership.io` against a real V3 media URL.
+- A separate V3 AWS principal (`V3_AWS_ACCESS_KEY_ID` / `V3_AWS_SECRET_ACCESS_KEY`)
+  serves every call on the V3 bucket, CopyObject included, so it also needs
+  `s3:GetObject` on the legacy bucket. Empty pair: legacy pair with a warning.
+- `apply --check-access` with the legacy pair only: login OK, both buckets
+  exist, cdnBase printed, probe copy refused by IAM (the legacy user
+  `searchie_production` has no `s3:PutObject` on the V3 bucket). Nothing was
+  written; the member check did not run. Needs the V3 pair in `.env`.
+- `apply --dry-run` on the pinned plan: unchanged, 2075 operations.
