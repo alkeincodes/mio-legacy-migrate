@@ -120,6 +120,23 @@ async function login(page: Page, url: string, email: string, password: string): 
   logger.info('logged in', { url, as: email });
 }
 
+/**
+ * The hub keeps a connection open, so 'networkidle' never fires; wait for load,
+ * give the client a moment to render, and record a page that will not load as a
+ * blank shot rather than abandoning the whole sheet.
+ */
+async function capture(page: Page, url: string, path: string): Promise<void> {
+  try {
+    await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
+    await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => undefined);
+    await page.waitForTimeout(1_500);
+    await page.screenshot({ path, fullPage: true });
+  } catch (error) {
+    logger.warn('could not capture a page; recording the failure', { url, error: error instanceof Error ? error.message.split('\n')[0] : String(error) });
+    await page.screenshot({ path, fullPage: false }).catch(() => undefined);
+  }
+}
+
 export async function captureContactSheet(opts: {
   env: Env;
   slugs: string[];
@@ -146,10 +163,8 @@ export async function captureContactSheet(opts: {
       for (const slug of opts.slugs) {
         const legacyPath = `shots/legacy-${slug}-${name}.png`;
         const v3Path = `shots/v3-${slug}-${name}.png`;
-        await legacyPage.goto(`${opts.legacyOrigin}/${slug}`, { waitUntil: 'networkidle', timeout: 60_000 });
-        await legacyPage.screenshot({ path: join(opts.runDir, legacyPath), fullPage: true });
-        await v3Page.goto(`${opts.v3Origin}/${slug}`, { waitUntil: 'networkidle', timeout: 60_000 });
-        await v3Page.screenshot({ path: join(opts.runDir, v3Path), fullPage: true });
+        await capture(legacyPage, `${opts.legacyOrigin}/${slug}`, join(opts.runDir, legacyPath));
+        await capture(v3Page, `${opts.v3Origin}/${slug}`, join(opts.runDir, v3Path));
         pairs.push({ slug, viewport: name, legacyPath, v3Path });
       }
 
@@ -185,7 +200,8 @@ export async function runBrowserPlaybackChecks(opts: {
       });
       const url = `${opts.v3Origin}/${slug}`;
       try {
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+        await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
+        await page.waitForTimeout(2_000);
       } catch (error) {
         results.push(evaluatePlayback(slug, url, {
           consoleErrors: [`Failed to load ${url}: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`],
