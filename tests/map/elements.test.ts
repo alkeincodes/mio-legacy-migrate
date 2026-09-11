@@ -193,3 +193,11 @@ describe('real legacy content shapes', () => {
     expect(node?.settings?.['newTab']).toBe(true);
   });
 });
+
+describe('image element that links a video file', () => {
+  it('shows the thumbnail conversion the legacy element displays, not the video original', () => {
+    const section = { ...fixture('image'), model_type: 'App\\File', model_id: 6, settings: JSON.stringify({ thumbnail: { url: 'https://cdn.legacy.example.com/4192507/conversions/x-optimized_thumbnail.png' } }) };
+    const node = mapElement(section, 3, { ...ctx(), assetForUrl: () => ({ legacyMediaId: 4192507, variant: 'optimized_thumbnail' }) });
+    expect(node?.value).toBe(assetRef(4192507, 'optimized_thumbnail'));
+  });
+});

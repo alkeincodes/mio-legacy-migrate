@@ -176,3 +176,11 @@ describe('page and url cards with real legacy shapes', () => {
     expect(button?.settings?.['newTab']).toBe(true);
   });
 });
+
+describe('file cards', () => {
+  it('reference the asset rather than the legacy file id, which V3 would 404 on', () => {
+    const fixture = loadFixture('grid-file');
+    const node = mapSection(fixture.section, 0, { ...contextFor(fixture, []), mediaIdForSection: () => 91234 });
+    expect(node.children?.[0]?.dataSource).toEqual({ type: 'file', id: 'ledger://asset/91234/original' });
+  });
+});

@@ -17,6 +17,8 @@ export interface MapContext {
   resolvePageSlug?(legacySlug: string): string;
   /** The V3 slug of a legacy page by id, for cards whose target is a page row. */
   pageSlugById?(legacyPageId: number): string | null;
+  /** The legacy media id behind a section that links a File. */
+  mediaIdForSection?(section: LegacySection): number | null;
 }
 
 export function assetRef(legacyMediaId: number, variant: string): string {
@@ -92,11 +94,17 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext): Cata
   }
 
   if (block.type.endsWith('-file')) {
+    // A legacy file id means nothing to V3; the card points at the asset and
+    // resolveRefs swaps in the V3 file id once the asset is verified.
+    const mediaId = ctx.mediaIdForSection?.(block) ?? null;
+    if (mediaId === null) {
+      ctx.warn({ pageSlug: ctx.pageSlug, legacySectionId: block.id, type: 'asset-pending', reason: `file card for legacy file ${String(block.model_id)} has no media in the bundle; emitted without a data source` });
+    }
     return {
       id,
       kind: 'content-card',
       settings: { actionFromScope: 'action' },
-      dataSource: { type: 'file', id: String(block.model_id ?? '') },
+      ...(mediaId === null ? {} : { dataSource: { type: 'file', id: assetRef(mediaId, 'original') } }),
       children: [],
     };
   }

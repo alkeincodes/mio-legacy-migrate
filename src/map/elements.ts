@@ -109,26 +109,28 @@ export function mapElement(
     case 'image': {
       const out: Record<string, unknown> = { alt: section.title ?? '' };
       if (settings['align'] === 'center') out['alignX'] = 'center';
-      const mediaId = ctx.mediaIdForSection(section);
-      let value = mediaId === null ? '' : assetRef(mediaId, 'original');
-      if (!value) {
-        // The legacy image element keeps its picture at settings.thumbnail.url,
-        // a CDN URL whose Spatie media row is owned by the section itself.
-        const url = (settings['thumbnail'] as Record<string, unknown> | undefined)?.['url'];
-        if (typeof url === 'string' && url.length > 0) {
-          const asset = ctx.assetForUrl?.(url) ?? null;
-          if (asset) {
-            value = assetRef(asset.legacyMediaId, asset.variant);
-          } else {
-            value = url;
-            ctx.warn({
-              pageSlug: ctx.pageSlug,
-              legacySectionId: section.id,
-              type: 'approximated',
-              reason: `image element points at ${url}, which is not in the asset manifest; the URL is used as-is`,
-            });
-          }
+      // The legacy image element shows settings.thumbnail.url (a Hub-owned media
+      // conversion), even when it also links a File, and that File may be a video.
+      // So the thumbnail comes first and the linked File's original is the fallback.
+      let value = '';
+      const url = (settings['thumbnail'] as Record<string, unknown> | undefined)?.['url'];
+      if (typeof url === 'string' && url.length > 0) {
+        const asset = ctx.assetForUrl?.(url) ?? null;
+        if (asset) {
+          value = assetRef(asset.legacyMediaId, asset.variant);
+        } else {
+          value = url;
+          ctx.warn({
+            pageSlug: ctx.pageSlug,
+            legacySectionId: section.id,
+            type: 'approximated',
+            reason: `image element points at ${url}, which is not in the asset manifest; the URL is used as-is`,
+          });
         }
+      }
+      if (!value) {
+        const mediaId = ctx.mediaIdForSection(section);
+        value = mediaId === null ? '' : assetRef(mediaId, 'original');
       }
       return { id, kind: 'image', value, settings: out };
     }

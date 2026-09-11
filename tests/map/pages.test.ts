@@ -115,3 +115,21 @@ describe('the content page', () => {
     expect(pages.map((p) => `${p.slug}:${p.pageType}`)).toEqual(['content:content', 'content-page:generic']);
   });
 });
+
+describe('links to reserved built-in routes', () => {
+  it('leaves /discussions pointing at the built-in route rather than the renamed page copy', async () => {
+    const { mapPages } = await import('../../src/map/pages.js');
+    const button = { id: 5, hub_id: 7, page_id: null, parent_id: 4, model_type: null, model_id: null, hidden: 0, type: 'button', title: null, label: 'Button', settings: JSON.stringify({ type: 'custom', link: { label: 'Go', url: 'https://x.example.com/discussions/c/intros' } }), permissions: null, meta: null, position: 0, segment_id: null };
+    const column = { ...button, id: 4, parent_id: 3, type: 'column', settings: '{}' };
+    const row = { ...button, id: 3, parent_id: null, page_id: 2, type: 'row', settings: '{}' };
+    const bundle = {
+      header: { legacyHubId: 7, legacyHubDomain: 'x.example.com' }, hub: { id: 7, auth: 1 },
+      pages: [page({ id: 1, slug: 'discussions', type: 'discussions' }), page({ id: 2, slug: 'about' })],
+      sections: [row, column, button], media: [], segmentables: [], segments: [], assets: [],
+    } as unknown as Parameters<typeof mapPages>[0];
+    const { pages } = mapPages(bundle);
+    const walk = (n: { children?: unknown[]; settings?: Record<string, unknown> }): unknown[] => [n, ...((n.children ?? []) as never[]).flatMap(walk)];
+    const btn = walk(pages.find((p) => p.slug === 'about')!.tree).find((n) => (n as { kind?: string }).kind === 'button') as { settings: { action: unknown } };
+    expect(btn.settings.action).toEqual({ type: 'page', value: '/discussions/c/intros' });
+  });
+});

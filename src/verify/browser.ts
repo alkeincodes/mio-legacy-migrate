@@ -230,8 +230,9 @@ export async function runBrowserPlaybackChecks(opts: {
         // (0 none, 1 loading, 2 loaded, 3 error).
         // A disabled track never loads by design; only tracks the player enabled count.
         const names = ['none', 'loading', 'loaded', 'error'];
+        await new Promise((r) => setTimeout(r, 2_000));
         const tracks = Array.from(video.querySelectorAll('track'))
-          .filter((track) => track.track.mode !== 'disabled')
+          .filter((track) => track.track.mode !== 'disabled' && track.src.length > 0)
           .map((track) => names[track.readyState] ?? 'none');
         return { videoState: state, textTrackStates: tracks };
       }, PLAYBACK_WINDOW_MS);

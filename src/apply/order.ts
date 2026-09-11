@@ -24,6 +24,8 @@ export function shouldPublish(page: PlanPage, mappedRuleTargets: Set<string>): b
 export interface RefResolver {
   asset(legacyMediaId: number, variant: string): { url: string } | { pending: true };
   playlist(legacyPlaylistId: number): string | null;
+  /** The V3 file id of a verified asset, for file cards; null while it is pending. */
+  file?(legacyMediaId: number): string | null;
 }
 
 const ASSET_REF = /^ledger:\/\/asset\/(\d+)\/(.+)$/;
@@ -44,11 +46,16 @@ export function resolveRefs(tree: CatalogNode, resolver: RefResolver): CatalogNo
 
     if (node.dataSource?.id) {
       const match = PLAYLIST_REF.exec(node.dataSource.id);
+      const assetMatch = ASSET_REF.exec(node.dataSource.id);
       if (match) {
         const id = resolver.playlist(Number(match[1]));
         next.dataSource = id === null
           ? { type: node.dataSource.type }
           : { type: node.dataSource.type, id };
+      } else if (assetMatch) {
+        const id = resolver.file?.(Number(assetMatch[1])) ?? null;
+        if (id === null) delete next.dataSource;
+        else next.dataSource = { type: node.dataSource.type, id };
       }
     }
 

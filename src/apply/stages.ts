@@ -426,6 +426,10 @@ export function refResolverFor(ctx: StageContext): RefResolver {
       return { pending: true };
     },
     playlist: (legacyPlaylistId) => v3IdOf(ctx, legacyPlaylistId),
+    file: (legacyMediaId) => {
+      const entry = ctx.store.all().find((e) => e.kind === 'asset' && e.legacyId === legacyMediaId && e.variant === 'original' && e.state === 'verified');
+      return entry?.v3Id ?? null;
+    },
   };
 }
 

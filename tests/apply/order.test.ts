@@ -102,3 +102,15 @@ describe('resolveRefs on button actions', () => {
     expect(out.children?.[0]?.settings?.['action']).toEqual({ type: 'page', value: '/content?playlist=pl_1' });
   });
 });
+
+describe('resolveRefs on file cards', () => {
+  const tree: CatalogNode = { id: 'r', kind: 'stack', children: [{ id: 'c', kind: 'content-card', dataSource: { type: 'file', id: 'ledger://asset/91234/original' }, children: [] }] };
+  it('swaps in the V3 file id once the asset is verified', () => {
+    const out = resolveRefs(tree, { asset: () => ({ pending: true }), playlist: () => null, file: () => 'file_9' });
+    expect(out.children?.[0]?.dataSource).toEqual({ type: 'file', id: 'file_9' });
+  });
+  it('drops the data source while the asset is pending, so V3 is not asked for a legacy id', () => {
+    const out = resolveRefs(tree, { asset: () => ({ pending: true }), playlist: () => null, file: () => null });
+    expect(out.children?.[0]?.dataSource).toBeUndefined();
+  });
+});

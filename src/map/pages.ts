@@ -120,7 +120,10 @@ export function mapPages(bundle: Bundle): {
     slugByLegacySlug.set(legacySlug, slug);
     if (legacySlug !== slug) renames.push({ legacySlug, slug, legacyPageId: page.id });
   }
-  const resolvePageSlug = (legacySlug: string): string => slugByLegacySlug.get(legacySlug) ?? legacySlug;
+  // A link to a slug V3 reserves for a built-in route (discussions, login, ...)
+  // should reach that route, not the renamed legacy copy of the page.
+  const resolvePageSlug = (legacySlug: string): string =>
+    RESERVED_SLUGS.has(legacySlug) ? legacySlug : (slugByLegacySlug.get(legacySlug) ?? legacySlug);
 
   for (const page of ordered) {
     const slug = slugByPage.get(page.id) ?? slugFor(page, taken);
@@ -134,6 +137,7 @@ export function mapPages(bundle: Bundle): {
       warn: (w) => warnings.push(w),
       resolvePageSlug,
       pageSlugById: (legacyPageId) => slugByPage.get(legacyPageId) ?? null,
+      mediaIdForSection: (s) => (s.model_type === MORPH_FILE && s.model_id !== null ? mediaByFileId.get(s.model_id) ?? null : null),
       mapElement: (section, ordinal) =>
         mapElement(section, ordinal, {
           legacyHubId: bundle.header.legacyHubId,
