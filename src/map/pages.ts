@@ -7,8 +7,16 @@ import type { PlanAccessRule, PlanPage, PlanWarning } from './plan.js';
 import { mapSection, type MapContext } from './sections.js';
 import { resolveGate } from './visibility.js';
 
-/** V3 rejects the slug "home"; everything else must match ^[a-z0-9][a-z0-9_-]*$. */
-const RESERVED_SLUGS = new Set(['home']);
+/**
+ * Page slugs the backend refuses with 422 page_slug_reserved because they
+ * collide with built-in routes (mio-backend app/pages/service.py RESERVED_SLUGS).
+ * Everything else must match ^[a-z0-9][a-z0-9_-]*$.
+ */
+const RESERVED_SLUGS = new Set([
+  'login', 'sign-in', 'home', 'payment', 'payments', 'content', 'legal', 'playlists', 'account',
+  'history', 'messages', 'moderation', 'my-list', 'notifications', 'forgot', 'forgot-password',
+  'register', 'reset-password', 'onboarding', 'members',
+]);
 
 export function slugFor(page: LegacyPage, taken: Set<string>): string {
   let base = (page.slug ?? '')

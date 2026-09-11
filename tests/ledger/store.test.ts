@@ -100,6 +100,14 @@ describe('LedgerStore.openForResume', () => {
     expect(() => LedgerStore.openForResume(dir, 'run-1', header(patch))).toThrow(new RegExp(field));
   });
 
+  it('accepts a changed plan hash only with acceptPlanChange, and records the new hash', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ledger-'));
+    LedgerStore.create(dir, header());
+    const store = LedgerStore.openForResume(dir, 'run-1', header({ planHash: 'different' }), { acceptPlanChange: true });
+    expect(store.header.planHash).toBe('different');
+    expect(LedgerStore.open(dir, 'run-1').header.planHash).toBe('different');
+  });
+
   it('refuses a resume whose target hub id differs from the recorded one', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ledger-'));
     LedgerStore.create(dir, header()).setTargetHubId('hub_abc');

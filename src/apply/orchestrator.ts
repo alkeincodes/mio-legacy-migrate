@@ -47,6 +47,8 @@ export interface ApplyOptions {
   hubSlug: string | null;
   /** Publish pages the fail-closed rule would hold, and list them as published-ungated. */
   publishHeld: boolean;
+  /** With --resume: accept a plan whose hash differs from the ledger's, after a mapper fix. */
+  acceptPlanChange: boolean;
 }
 
 /** Every entity kind apply may touch, checked against docs/contracts.md at startup. */
@@ -167,7 +169,7 @@ export async function runApply(options: ApplyOptions): Promise<string> {
   await preflight({ profile, apiKey, cli, api });
 
   const store = options.resumeRunId
-    ? LedgerStore.openForResume(dir, runId, header)
+    ? LedgerStore.openForResume(dir, runId, header, { acceptPlanChange: options.acceptPlanChange })
     : LedgerStore.create(dir, header);
 
   const lock = Lock.acquire(dir, runId, { breakLock: options.breakLock });

@@ -29,6 +29,12 @@ describe('slugFor', () => {
     expect(slugFor(page({ slug: 'home' }), new Set())).toBe('home-page');
   });
 
+  it('renames every slug the backend reserves for a built-in route, which 422s as page_slug_reserved', () => {
+    for (const reserved of ['onboarding', 'login', 'register', 'content', 'members', 'my-list']) {
+      expect(slugFor(page({ slug: reserved }), new Set())).toBe(`${reserved}-page`);
+    }
+  });
+
   it('de-duplicates against slugs already taken', () => {
     expect(slugFor(page({ slug: 'about' }), new Set(['about']))).toBe('about-2');
   });

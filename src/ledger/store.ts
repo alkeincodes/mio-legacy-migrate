@@ -50,9 +50,21 @@ export class LedgerStore {
     return new LedgerStore(path, parsed);
   }
 
-  static openForResume(dir: string, runId: string, expected: LedgerHeader): LedgerStore {
+  static openForResume(
+    dir: string,
+    runId: string,
+    expected: LedgerHeader,
+    opts: { acceptPlanChange?: boolean } = {},
+  ): LedgerStore {
     const store = LedgerStore.open(dir, runId);
     const actual = store.header;
+    if (opts.acceptPlanChange && actual.planHash !== expected.planHash) {
+      process.stderr.write(
+        `WARN resuming run ${runId} with a changed plan: ledger planHash ${actual.planHash.slice(0, 12)} -> ${expected.planHash.slice(0, 12)} (--accept-plan-change). Entries already done are adopted by marker; only work not yet created follows the new plan.\n`,
+      );
+      actual.planHash = expected.planHash;
+      store.flush();
+    }
     for (const field of COMPARED_HEADER_FIELDS) {
       if (actual[field] !== expected[field]) {
         throw new LedgerMismatchError(
@@ -101,7 +113,7 @@ export class LedgerStore {
   }
 
   /** Write to a temp file in the same directory, fsync, rename. */
-  private flush(): void {
+  flush(): void {
     const tmp = `${this.path}.tmp`;
     writeFileSync(tmp, JSON.stringify(this.file, null, 2), { encoding: 'utf8', mode: 0o600 });
     const fd = openSync(tmp, 'r');
