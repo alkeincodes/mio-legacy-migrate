@@ -195,8 +195,14 @@ export async function runBrowserPlaybackChecks(opts: {
 
     for (const slug of opts.slugs) {
       const consoleErrors: string[] = [];
+      // Only errors raised by a media request count; a 404 on some unrelated
+      // resource must not fail the playback check.
       page.on('console', (message) => {
-        if (message.type() === 'error') consoleErrors.push(message.text());
+        if (message.type() !== 'error') return;
+        const at = message.location().url ?? '';
+        const text = message.text();
+        const aboutMedia = /\.(m3u8|mp4|m4v|mov|ts|vtt|webm)(\?|$)/i.test(at) || /cdn\.|\/media\//i.test(at) || /MEDIA_ERR|CORS|hls/i.test(text);
+        if (aboutMedia) consoleErrors.push(`${text} (${at})`);
       });
       const url = `${opts.v3Origin}/${slug}`;
       try {
@@ -222,10 +228,11 @@ export async function runBrowserPlaybackChecks(opts: {
         });
         // TextTrack has no readiness; the <track> element's readyState does
         // (0 none, 1 loading, 2 loaded, 3 error).
+        // A disabled track never loads by design; only tracks the player enabled count.
         const names = ['none', 'loading', 'loaded', 'error'];
-        const tracks = Array.from(video.querySelectorAll('track')).map(
-          (track) => names[track.readyState] ?? 'none',
-        );
+        const tracks = Array.from(video.querySelectorAll('track'))
+          .filter((track) => track.track.mode !== 'disabled')
+          .map((track) => names[track.readyState] ?? 'none');
         return { videoState: state, textTrackStates: tracks };
       }, PLAYBACK_WINDOW_MS);
 

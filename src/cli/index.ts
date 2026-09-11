@@ -92,12 +92,14 @@ program
   .requiredOption('--profile <name>', 'target profile name')
   .requiredOption('--plan <path>', 'the plan that run applied')
   .option('--milestone <m>', 'M1 or M2 acceptance rules', 'M1')
-  .action(async (opts: { run: string; profile: string; plan: string; milestone: string }) => {
+  .option('--skip-contact-sheet', 'reuse the run\'s existing contact sheet', false)
+  .action(async (opts: { run: string; profile: string; plan: string; milestone: string; skipContactSheet: boolean }) => {
     const verdict = await runVerify({
       runId: opts.run,
       profileName: opts.profile,
       planPath: opts.plan,
       milestone: opts.milestone === 'M2' ? 'M2' : 'M1',
+      skipContactSheet: opts.skipContactSheet,
     });
     if (!verdict.accepted) process.exitCode = 1;
   });

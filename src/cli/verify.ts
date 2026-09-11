@@ -19,6 +19,8 @@ export async function runVerify(opts: {
   profileName: string;
   planPath: string;
   milestone: 'M1' | 'M2';
+  /** Reuse the run's existing contact sheet instead of capturing 124 shots again. */
+  skipContactSheet?: boolean;
 }): Promise<AcceptanceVerdict> {
   const env = loadEnv('.env', { require: ['cdn', 'logins'] });
   logger.setSecrets(secretsOf(env));
@@ -72,10 +74,14 @@ export async function runVerify(opts: {
   if (!plan.legacyHubDomain) throw new Error('the plan carries no legacyHubDomain; re-run map');
   const legacyOrigin = `https://${plan.legacyHubDomain}`;
 
-  await captureContactSheet({
-    env, slugs: plan.pages.map((p) => p.slug), legacyOrigin, v3Origin,
-    hubTitle: plan.hub.title, runDir,
-  });
+  if (opts.skipContactSheet && existsSync(`${runDir}/contact-sheet.html`)) {
+    logger.info('reusing the existing contact sheet', { path: `${runDir}/contact-sheet.html` });
+  } else {
+    await captureContactSheet({
+      env, slugs: plan.pages.map((p) => p.slug), legacyOrigin, v3Origin,
+      hubTitle: plan.hub.title, runDir,
+    });
+  }
 
   // Only pages whose tree shows a legacy-linked video get the browser check.
   const legacyLinkedVideo = new Set(
