@@ -38,9 +38,16 @@ export function mapNavigation(
   pageTypeById: Map<number, string> = new Map(),
   /** Pages the plan leaves out; a menu item pointing at one is dropped (the discussions item stays, as V3's own). */
   excludedPageIds: Set<number> = new Set(),
+  /**
+   * The legacy header's built-in home entry (theme sections.header.menuWelcome),
+   * which is not a menu row. Emitted first as a page item for the homepage; the
+   * hub resolves a page item whose page is the homepage to the hub root.
+   */
+  home: { label: string; pageSlug: string } | null = null,
 ): { navigation: PlanNavigation; warnings: PlanWarning[] } {
   const warnings: PlanWarning[] = [];
   const navigation: PlanNavigation = { header: [], footer: [], mobile: [] };
+  if (home) navigation.header.push({ type: 'page', label: home.label.slice(0, MAX_LABEL), pageSlugRef: home.pageSlug, position: 0 });
 
   const items = [...bundle.menuItems].sort((a, b) => a.position - b.position);
   for (const item of items) {
@@ -106,4 +113,13 @@ export function mapNavigation(
   renumber(navigation.footer);
 
   return { navigation, warnings };
+}
+
+/** The legacy header's home entry label (theme sections.header.menuWelcome.title), or "Home" when the theme has the entry without a title. */
+export function homeMenuLabel(themeSettings: Record<string, unknown>): string | null {
+  const header = ((themeSettings['sections'] as Record<string, unknown> | undefined)?.['header'] ?? {}) as Record<string, unknown>;
+  const welcome = header['menuWelcome'];
+  if (!welcome || typeof welcome !== 'object') return null;
+  const title = (welcome as Record<string, unknown>)['title'];
+  return typeof title === 'string' && title.trim() ? title.trim() : 'Home';
 }

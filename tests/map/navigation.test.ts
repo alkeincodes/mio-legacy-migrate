@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapNavigation, menuItemHref } from '../../src/map/navigation.js';
+import { homeMenuLabel, mapNavigation, menuItemHref } from '../../src/map/navigation.js';
 import type { Bundle } from '../../src/extract/bundle.js';
 import type { LegacyMenuItem } from '../../src/extract/queries.js';
 
@@ -104,5 +104,22 @@ describe('the legacy discussions page in the menu', () => {
       { type: 'page', label: 'ABOUT', pageSlugRef: 'about', position: 1 },
     ]);
     expect(warnings).toEqual([expect.objectContaining({ type: 'excluded', reason: expect.stringContaining('"LOGIN"') })]);
+  });
+
+  it('puts the legacy header home entry first, as a page item for the homepage, which the hub resolves to the hub root', () => {
+    const { navigation } = mapNavigation(bundle([item({ id: 1, title: 'ABOUT', model_id: 100 })]), slugs, new Map(), new Set(), { label: 'HOME', pageSlug: 'home-page' });
+    expect(navigation.header).toEqual([
+      { type: 'page', label: 'HOME', pageSlugRef: 'home-page', position: 0 },
+      { type: 'page', label: 'ABOUT', pageSlugRef: 'about', position: 1 },
+    ]);
+  });
+});
+
+describe('homeMenuLabel', () => {
+  it('reads the legacy menuWelcome title, defaults to Home when the entry has none, and is null without the entry', () => {
+    expect(homeMenuLabel({ sections: { header: { menuWelcome: { title: 'HOME', settings: { icon: { show: false } } } } } })).toBe('HOME');
+    expect(homeMenuLabel({ sections: { header: { menuWelcome: { settings: {} } } } })).toBe('Home');
+    expect(homeMenuLabel({ sections: { header: {} } })).toBeNull();
+    expect(homeMenuLabel({})).toBeNull();
   });
 });

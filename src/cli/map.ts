@@ -4,12 +4,13 @@ import { TOOL_VERSION } from '../version.js';
 import { fetchCatalog, validateTree } from '../map/catalog.js';
 import { mapBranding } from '../map/branding.js';
 import { dominantButtonColour } from '../map/style.js';
-import { mapNavigation } from '../map/navigation.js';
+import { homeMenuLabel, mapNavigation } from '../map/navigation.js';
 import { mapPages } from '../map/pages.js';
 import { mapSegment } from '../map/segments.js';
 import { SECTION_TABLE } from '../map/sectionTable.js';
 import { writePlan, type Plan, type PlanSegment, type PlanTag, type PlanWarning } from '../map/plan.js';
 import { MORPH_HUB } from '../extract/queries.js';
+import { parseJsonObject } from '../extract/json.js';
 
 /** The V3 slug: the legacy custom subdomain when set, else the first label of the legacy domain. */
 export function hubSlugFor(customSubdomain: string | null, domain: string, legacyHubId: number): string {
@@ -34,8 +35,11 @@ export async function runMap(options: MapOptions): Promise<string> {
   warnings.push(...pageWarnings);
 
   const slugByPageId = new Map(pages.map((p) => [p.legacyPageId, p.slug]));
+  const homePage = pages.find((p) => p.isHomepage);
+  const homeLabel = homeMenuLabel(parseJsonObject(bundle.theme?.settings));
   const { navigation, warnings: navWarnings } = mapNavigation(
     bundle, slugByPageId, new Map(bundle.pages.map((pg) => [pg.id, pg.type])), new Set(excluded.map((e) => e.legacyPageId)),
+    homePage && homeLabel ? { label: homeLabel, pageSlug: homePage.slug } : null,
   );
   warnings.push(...navWarnings);
 
