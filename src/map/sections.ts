@@ -25,6 +25,8 @@ export interface MapContext {
   mediaIdForSection?(section: LegacySection): number | null;
   /** The manifest entry behind a legacy CDN URL, for card and section images. */
   assetForUrl?(url: string): { legacyMediaId: number; variant: string } | null;
+  /** The legacy theme colours, so a 'secondary-color' background carries the real hex. */
+  themeColours?: { primary?: string; secondary?: string };
 }
 
 export function assetRef(legacyMediaId: number, variant: string): string {
@@ -117,7 +119,7 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext): Cata
     const styles = settings['styles'] as Record<string, unknown> | undefined;
     const nodeSettings: Record<string, unknown> = { gap: 4, width: stackWidthFor(settings['size']) };
     if (styles?.['align'] === 'center') nodeSettings['align'] = 'center';
-    const surface = columnSurfaceFor(settings);
+    const surface = columnSurfaceFor(settings, ctx.themeColours ?? {});
     if (surface) nodeSettings['surface'] = surface;
     return { id, kind: 'stack', settings: nodeSettings, children };
   }
@@ -237,7 +239,7 @@ export function mapSection(section: LegacySection, ordinal: number, ctx: MapCont
   const id = nodeId(ctx.legacyHubId, ctx.legacyPageId, section.id, ordinal);
   const settings = parseSettings(section.settings);
   const mapping = lookupMapping(section.type, 'section');
-  const surface = sectionSurfaceFor(settings, section.hidden === 1);
+  const surface = sectionSurfaceFor(settings, section.hidden === 1, ctx.themeColours ?? {});
   const mint = (n: number): string => nodeId(ctx.legacyHubId, ctx.legacyPageId, section.id, EXTRA_ORDINAL_BASE + n);
 
   if (!mapping) {
@@ -269,15 +271,23 @@ export function mapSection(section: LegacySection, ordinal: number, ctx: MapCont
   // A grid or strip of playlists takes the catalog's own data-bound recipe, one per playlist.
   if (playlistBlocks.length > 0 && (mapping.template === 'grid' || mapping.template === 'compact' || mapping.template === 'carousel' || mapping.template === 'content-grid')) {
     const recipeName = mapping.template === 'compact' ? 'compact-playlist' : 'grid-playlist';
+    const titleDoc = parseDoc(section.title);
+    const titleShown = (settings['title'] as Record<string, unknown> | undefined)?.['show'] !== false;
+    const titleText = titleDoc ? docToText(titleDoc) : (section.title ?? '');
+    const titleNode: CatalogNode | null = titleShown && titleText
+      ? { id: mint(9), kind: 'headline', value: titleText, settings: { level: 2, weight: 700 } }
+      : null;
     if (playlistBlocks.length === 1) {
       const node = bindPlaylist(recipe(recipeName, ctx, section.id), playlistRef(playlistBlocks[0]!.model_id!));
       node.id = id;
       node.settings = { ...(node.settings ?? {}), surface: { ...((node.settings?.['surface'] as Record<string, unknown>) ?? {}), ...surface } };
+      if (titleNode) node.children = [titleNode, ...(node.children ?? [])];
       return node;
     }
     // Several playlists in one legacy grid: one card per playlist inside a responsive grid.
     const cards = playlistBlocks.map((block, i) => blockNode(block, i, ctx));
     return sectionContainer(id, mapping.template, surface, [
+      ...(titleNode ? [titleNode] : []),
       { id: mint(0), kind: 'grid', settings: { variant: 'responsive' }, children: cards },
     ]);
   }

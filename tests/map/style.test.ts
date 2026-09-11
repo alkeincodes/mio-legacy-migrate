@@ -48,3 +48,9 @@ describe('style translation', () => {
     expect(dominantButtonColour([btn('#5770D1'), btn('#000000')])).toBeNull();
   });
 });
+
+describe('theme-colour backgrounds', () => {
+  it('carry the legacy theme hex instead of a V3 token, which means the page ink in custom mode', () => {
+    expect(sectionSurfaceFor({ background: { type: 'secondary-color' } }, false, { secondary: '#333333' })['background']).toEqual({ type: 'custom-color', value: '#333333' });
+  });
+});

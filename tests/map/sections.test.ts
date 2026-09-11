@@ -204,3 +204,11 @@ describe('file cards', () => {
     expect(node.children?.[0]?.children?.[0]?.dataSource).toEqual({ type: 'file', id: 'ledger://asset/91234/original' });
   });
 });
+
+describe('playlist section titles', () => {
+  it('keeps the legacy section title as a headline above the playlist recipe', () => {
+    const fixture = loadFixture('grid-playlist');
+    const node = mapSection({ ...fixture.section, title: 'Begin Training' }, 1, contextFor(fixture, []));
+    expect(node.children?.[0]).toMatchObject({ kind: 'headline', value: 'Begin Training' });
+  });
+});

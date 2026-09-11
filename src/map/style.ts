@@ -24,7 +24,9 @@ export function surfacePaddingFor(styles: Record<string, unknown> | undefined): 
 }
 
 /** Legacy `background` to `surface.background`; null when it is the page default. */
-export function surfaceBackgroundFor(background: Record<string, unknown> | undefined): Record<string, unknown> | null {
+export interface ThemeColours { primary?: string; secondary?: string }
+
+export function surfaceBackgroundFor(background: Record<string, unknown> | undefined, theme: ThemeColours = {}): Record<string, unknown> | null {
   if (!background) return null;
   const type = background['type'];
   const colour = typeof background['color'] === 'string' && HEX6.test(background['color']) ? background['color'] : null;
@@ -36,10 +38,12 @@ export function surfaceBackgroundFor(background: Record<string, unknown> | undef
     case 'custom-color':
     case 'color':
       return colour ? { type: 'custom-color', value: colour } : null;
+    // Legacy paints its own theme colour; V3's `secondary` token is the page ink,
+    // not that colour, so the hex is carried when the theme is known.
     case 'secondary-color':
-      return { type: 'color', token: 'secondary' };
+      return theme.secondary && HEX6.test(theme.secondary) ? { type: 'custom-color', value: theme.secondary } : { type: 'color', token: 'secondary' };
     case 'primary-color':
-      return { type: 'color', token: 'primary' };
+      return theme.primary && HEX6.test(theme.primary) ? { type: 'custom-color', value: theme.primary } : { type: 'color', token: 'primary' };
     case 'thumbnail':
       return null;
     default:
@@ -48,10 +52,10 @@ export function surfaceBackgroundFor(background: Record<string, unknown> | undef
 }
 
 /** A section's full surface: background, padding and per-device visibility. */
-export function sectionSurfaceFor(settings: Record<string, unknown>, hidden: boolean): Surface {
+export function sectionSurfaceFor(settings: Record<string, unknown>, hidden: boolean, theme: ThemeColours = {}): Surface {
   const styles = settings['styles'] as Record<string, unknown> | undefined;
   const surface: Surface = { padding: surfacePaddingFor(styles) };
-  const background = surfaceBackgroundFor(settings['background'] as Record<string, unknown> | undefined);
+  const background = surfaceBackgroundFor(settings['background'] as Record<string, unknown> | undefined, theme);
   if (background) surface['background'] = background;
   const visibility = styles?.['visibility'];
   if (hidden) surface['visibility'] = { desktop: false, mobile: false };
@@ -73,10 +77,10 @@ export function stackWidthFor(size: unknown): string {
 }
 
 /** A column's own decoration (padding, border, radius, background) as a stack surface, or null. */
-export function columnSurfaceFor(settings: Record<string, unknown>): Surface | null {
+export function columnSurfaceFor(settings: Record<string, unknown>, theme: ThemeColours = {}): Surface | null {
   const styles = settings['styles'] as Record<string, unknown> | undefined;
   const surface: Surface = {};
-  const background = surfaceBackgroundFor(settings['background'] as Record<string, unknown> | undefined);
+  const background = surfaceBackgroundFor(settings['background'] as Record<string, unknown> | undefined, theme);
   if (background) surface['background'] = background;
   const padding = styles?.['padding'] as Record<string, unknown> | undefined;
   if (padding && padding['show'] !== false && Object.keys(padding).some((k) => k !== 'show')) surface['padding'] = 'card';

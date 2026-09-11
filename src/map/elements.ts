@@ -52,6 +52,11 @@ function actionFor(
 
 const HUB_ORIGINS = ['https://alliance.mantalks.com', 'http://alliance.mantalks.com'];
 
+/** The editor's display names ("Paragraph", "Headline - Copy") are not content. */
+function isDisplayLabel(text: string): boolean {
+  return /^(paragraph|headline|subheadline|button|image|text)( - copy)*$/i.test(text.trim());
+}
+
 export function mapElement(
   section: LegacySection,
   ordinal: number,
@@ -82,7 +87,9 @@ export function mapElement(
       const doc = parseDoc(section.title);
       warnPersonalisation(doc);
       const isSubheadline = /^subheadline/i.test(section.label ?? '') || settings['size'] === 'medium';
-      return { id, kind: 'headline', value: doc ? docToText(doc) : content, settings: headlineSettingsFor(settings, isSubheadline) };
+      const headlineText = doc ? docToText(doc) : isDisplayLabel(content) ? '' : content;
+      if (!headlineText) return null;
+      return { id, kind: 'headline', value: headlineText, settings: headlineSettingsFor(settings, isSubheadline) };
     }
 
     case 'text': {
@@ -94,7 +101,9 @@ export function mapElement(
       if (doc && /<(strong|em|u|a |ul|ol)/.test(docToHtml(doc))) {
         ctx.warn({ pageSlug: ctx.pageSlug, legacySectionId: section.id, type: 'approximated', reason: 'legacy paragraph carries formatting (bold, links or a list) that the V3 text node cannot show; flattened to plain text' });
       }
-      return { id, kind: 'text', value: doc ? docToText(doc) : content, settings: out };
+      const text = doc ? docToText(doc) : isDisplayLabel(content) ? '' : content;
+      if (!text) return null;
+      return { id, kind: 'text', value: text, settings: out };
     }
 
     case 'image': {

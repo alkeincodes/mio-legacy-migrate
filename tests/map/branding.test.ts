@@ -87,6 +87,7 @@ describe('theme mode and primary', () => {
     const { branding, hubSettings } = mapBranding(theme({ colors: { background: '#333333', text: '#FAFAFA', primary: '#F7F2E8' }, darkMode: true }), [], CDN, S3);
     expect(hubSettings).toEqual({ background: { type: 'custom' } });
     expect(branding['header_color']).toBe('#333333');
+    expect(branding['header_accent']).toBe('#FAFAFA');
   });
 
   it('uses the dominant legacy button colour as the V3 primary, and says so', () => {

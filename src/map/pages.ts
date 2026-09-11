@@ -1,6 +1,7 @@
 import type { Bundle } from '../extract/bundle.js';
 import { MORPH_FILE, type LegacyHub, type LegacyPage, type LegacySection } from '../extract/queries.js';
 import type { CatalogNode } from './catalog.js';
+import { parseJsonObject } from '../extract/json.js';
 import { mapElement } from './elements.js';
 import { nodeId } from './nodeId.js';
 import type { PlanAccessRule, PlanPage, PlanWarning } from './plan.js';
@@ -82,6 +83,8 @@ export function mapPages(bundle: Bundle): {
     }
   }
 
+  const themeSettings = parseJsonObject(bundle.theme?.settings);
+  const themeColours = (themeSettings['colors'] ?? {}) as { primary?: string; secondary?: string };
   const assetByUrl = new Map(bundle.assets.map((a) => [a.cdnUrl, { legacyMediaId: a.legacyMediaId, variant: a.variant }]));
 
   const sectionsByParent = new Map<number, LegacySection[]>();
@@ -147,6 +150,7 @@ export function mapPages(bundle: Bundle): {
       pageSlugById: routeSlugById,
       mediaIdForSection: (s) => (s.model_type === MORPH_FILE && s.model_id !== null ? mediaByFileId.get(s.model_id) ?? null : null),
       assetForUrl: (url) => assetByUrl.get(url) ?? null,
+      themeColours,
       mapElement: (section, ordinal) =>
         mapElement(section, ordinal, {
           legacyHubId: bundle.header.legacyHubId,

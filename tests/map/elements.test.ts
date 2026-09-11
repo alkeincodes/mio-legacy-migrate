@@ -201,3 +201,11 @@ describe('image element that links a video file', () => {
     expect(node?.value).toBe(assetRef(4192507, 'optimized_thumbnail'));
   });
 });
+
+describe('empty elements', () => {
+  it('drops a paragraph whose document is empty rather than showing the editor label', () => {
+    const section = { ...fixture('text'), label: 'Paragraph', settings: JSON.stringify({ value: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph' }] }) }) };
+    expect(mapElement(section, 2, ctx())).toBeNull();
+    expect(mapElement({ ...fixture('text'), label: 'Paragraph - Copy', settings: '{}' }, 2, ctx())).toBeNull();
+  });
+});

@@ -69,6 +69,8 @@ export function mapBranding(
     if (branding['background'] || branding['text']) {
       hubSettings['background'] = { type: 'custom' };
       if (branding['background']) branding['header_color'] = branding['background'];
+      // The header takes header_accent as its text colour raw; legacy paints the nav in the page ink.
+      if (branding['text']) branding['header_accent'] = branding['text'];
     }
 
     // Legacy buttons carry their own colours; V3 buttons take the hub primary. When
