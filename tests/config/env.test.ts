@@ -69,6 +69,16 @@ describe('loadEnv with require groups', () => {
   });
 });
 
+describe('optional keys outside every group', () => {
+  it('carries an optional value present in the file even when its group is not required', () => {
+    const path = writeEnv(`${COMPLETE}\nV3_PLATFORM_LOGIN_EMAIL=admin@example.com\nV3_AWS_ACCESS_KEY_ID=AKIA_V3`);
+    const env = loadEnv(path, { require: ['cdn'] });
+    expect(env.v3PlatformLoginEmail).toBe('admin@example.com');
+    expect(env.v3AwsAccessKeyId).toBe('AKIA_V3');
+    expect(loadEnv(path, { require: ['cdn', 'logins'] }).v3VerifyLoginEmail).toBe('b@example.com');
+  });
+});
+
 describe('env file warnings', () => {
   it('flags an unquoted value containing #, which dotenv would truncate', () => {
     expect(envFileWarnings("LEGACY_DB_PASSWORD=abc#def\nOTHER='a#b'\nX=\"c#d\"")).toEqual([

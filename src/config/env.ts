@@ -116,7 +116,9 @@ export function loadEnv(
     Object.fromEntries([...required].map((k) => [k, true])) as Record<keyof typeof EnvSchema.shape, true>,
   )
     .transform((partial) => ({
-      ...Object.fromEntries(Object.keys(EnvSchema.shape).map((k) => [k, PLACEHOLDERS[k] ?? 'unset'])),
+      // Keys outside the required groups keep whatever the file holds (the optional
+      // V3 pairs live here); only an absent key gets a placeholder.
+      ...Object.fromEntries(Object.keys(EnvSchema.shape).map((k) => [k, fileVars[k] || (PLACEHOLDERS[k] ?? 'unset')])),
       ...partial,
     }))
     .pipe(EnvSchema);
