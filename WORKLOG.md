@@ -168,3 +168,10 @@ rewrite republishes up to 31 pages against the 60/hour publish limit, so
 consecutive rewrites wait for the window. The verify user must be a HUB
 MEMBER (`V3_VERIFY_LOGIN_*`); the API keeps a platform user
 (`V3_PLATFORM_LOGIN_*`).
+
+Final verify of the run (2026-09-12 ~21:55 UTC): pages 31/31, playlists
+67/67, folders 19/19; tree digests match on 30 of 31 pages; browser playback
+3 of 3 OK; contact sheet 124 shots with the hub member logged in. Not
+accepted for two reasons only: `/content` shows 0 sections on the target (V3
+renders the content page itself, so the one migrated section is ignored) and
+the authorization matrix is skipped until the two test members exist.
