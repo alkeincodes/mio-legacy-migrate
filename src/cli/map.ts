@@ -9,6 +9,7 @@ import { mapPages } from '../map/pages.js';
 import { mapSegment } from '../map/segments.js';
 import { SECTION_TABLE } from '../map/sectionTable.js';
 import { writePlan, type Plan, type PlanSegment, type PlanTag, type PlanWarning } from '../map/plan.js';
+import { collapseFidelity } from '../map/translate/fidelity.js';
 import { MORPH_HUB } from '../extract/queries.js';
 import { parseJsonObject } from '../extract/json.js';
 
@@ -155,7 +156,7 @@ export async function runMap(options: MapOptions): Promise<string> {
     tags: [...tags.values()].sort((a, b) => a.slug.localeCompare(b.slug)),
     accessRules,
     navigation,
-    warnings,
+    warnings: collapseFidelity(warnings),
   };
 
   const unreviewed = SECTION_TABLE.filter((m) => m.reviewed === 'no').map((m) => m.legacyType);
@@ -172,5 +173,17 @@ export async function runMap(options: MapOptions): Promise<string> {
     warnings: plan.warnings.length,
     dropped: plan.warnings.filter((w) => w.type === 'dropped').length,
   });
+  // One line per distinct legacy-to-V3 difference, most frequent first.
+  const byProperty = new Map<string, { property: string; legacy: string; v3: string; count: number }>();
+  for (const w of plan.warnings) {
+    if (w.type !== 'fidelity') continue;
+    const key = `${w.property ?? ''}|${w.legacy ?? ''}|${w.v3 ?? ''}`;
+    const entry = byProperty.get(key) ?? { property: w.property ?? '', legacy: w.legacy ?? '', v3: w.v3 ?? '', count: 0 };
+    entry.count += w.count ?? 1;
+    byProperty.set(key, entry);
+  }
+  for (const entry of [...byProperty.values()].sort((a, b) => b.count - a.count || a.property.localeCompare(b.property))) {
+    logger.info('fidelity', entry);
+  }
   return path;
 }

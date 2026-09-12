@@ -2,6 +2,7 @@ import type { LegacyHubTheme, LegacyMedia } from '../extract/queries.js';
 import { cdnUrlFor, variantsOf } from '../extract/mediaPaths.js';
 import type { PlanWarning } from './plan.js';
 import { parseJsonObject } from '../extract/json.js';
+import { px } from './profile/hub.js';
 
 /** Legacy Spatie collection name to V3 branding key. */
 const COLLECTION_TO_KEY: Record<string, string> = {
@@ -23,8 +24,8 @@ export function mapBranding(
   cdnUrl: string,
   s3Url: string,
   opts: { dominantButton?: { background: string; text: string } | null } = {},
-): { branding: Record<string, string | boolean>; hubSettings: Record<string, unknown>; warnings: PlanWarning[] } {
-  const branding: Record<string, string | boolean> = {};
+): { branding: Record<string, string | boolean | number>; hubSettings: Record<string, unknown>; warnings: PlanWarning[] } {
+  const branding: Record<string, string | boolean | number> = {};
   const hubSettings: Record<string, unknown> = {};
   const warnings: PlanWarning[] = [];
 
@@ -40,6 +41,12 @@ export function mapBranding(
     const fonts = settings['fonts'] as Record<string, unknown> | undefined;
     if (typeof fonts?.['heading'] === 'string' && fonts['heading'].trim()) branding['font_heading'] = fonts['heading'].trim();
     if (typeof fonts?.['body'] === 'string' && fonts['body'].trim()) branding['font_body'] = fonts['body'].trim();
+    // V3 branding.heading_font_size / body_font_size drive the whole text ladder
+    // (mio-hub src/lib/hub-shape/branding.ts:137); legacy stores the same px.
+    const headingSize = px(fonts?.['headingFontSize'], NaN);
+    const bodySize = px(fonts?.['bodyFontSize'], NaN);
+    if (Number.isFinite(headingSize) && headingSize > 0) branding['heading_font_size'] = headingSize;
+    if (Number.isFinite(bodySize) && bodySize > 0) branding['body_font_size'] = bodySize;
 
     const colours = (settings['colors'] ?? {}) as Record<string, unknown>;
     for (const [legacyKey, v3Key] of [

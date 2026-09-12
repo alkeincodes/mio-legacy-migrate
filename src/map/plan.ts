@@ -138,7 +138,7 @@ export interface Plan {
   /** Legacy page slugs the mapper renamed (reserved on V3, or duplicates). */
   pageSlugRenames?: Array<{ legacySlug: string; slug: string; legacyPageId: number }>;
   hub: PlanHub;
-  branding: Record<string, string | boolean>;
+  branding: Record<string, string | boolean | number>;
   /** Hub settings apply merges over the target (theme mode); absent on older plans. */
   hubSettings?: Record<string, unknown>;
   pages: PlanPage[];

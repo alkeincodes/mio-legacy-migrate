@@ -114,4 +114,11 @@ describe('theme mode and primary', () => {
     expect(branding['primary']).toBe('#5770D1');
     expect(warnings.some((w) => w.reason.includes('#5770D1'))).toBe(true);
   });
+
+  it('carries the legacy heading and body font sizes when the theme sets them', () => {
+    const { branding } = mapBranding(theme({ fonts: { headingFontSize: 40, bodyFontSize: '18' } }), [], CDN, S3);
+    expect(branding['heading_font_size']).toBe(40);
+    expect(branding['body_font_size']).toBe(18);
+    expect(mapBranding(theme({}), [], CDN, S3).branding).not.toHaveProperty('heading_font_size');
+  });
 });
