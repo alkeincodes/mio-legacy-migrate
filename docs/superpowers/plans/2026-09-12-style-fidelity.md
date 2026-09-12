@@ -52,7 +52,7 @@ tests/map/profile-*.test.ts, tests/map/translate-*.test.ts, tests/fixtures/secti
 **Interfaces:**
 - Produces: every type in `types.ts` below; `hubStyleProfile(themeSettings: Record<string, unknown>): HubStyleProfile`; `buttonChromeFrom(styles: Record<string, unknown> | undefined): ButtonChrome`; `imageChromeFrom(styles: Record<string, unknown> | undefined): ImageChrome`; `DEFAULT_HUB_PROFILE: HubStyleProfile`.
 
-- [ ] **Step 1: Write the types**
+- [x] **Step 1: Write the types**
 
 `src/map/profile/types.ts`:
 
@@ -149,7 +149,7 @@ export interface OtherProfile extends ElementProfileBase { kind: 'other' }
 export type ElementProfile = HeadlineProfile | TextProfile | ImageProfile | ButtonProfile | OtherProfile;
 ```
 
-- [ ] **Step 2: Write the failing hub profile test**
+- [x] **Step 2: Write the failing hub profile test**
 
 `tests/map/profile-hub.test.ts`:
 
@@ -212,12 +212,12 @@ describe('imageChromeFrom', () => {
 });
 ```
 
-- [ ] **Step 3: Run it to see it fail**
+- [x] **Step 3: Run it to see it fail**
 
 Run: `nvm use && npx vitest run tests/map/profile-hub.test.ts`
 Expected: FAIL, cannot find module `../../src/map/profile/hub.js`.
 
-- [ ] **Step 4: Implement `hub.ts`**
+- [x] **Step 4: Implement `hub.ts`**
 
 `src/map/profile/hub.ts`:
 
@@ -312,12 +312,12 @@ export function hubStyleProfile(themeSettings: Obj): HubStyleProfile {
 }
 ```
 
-- [ ] **Step 5: Run the test**
+- [x] **Step 5: Run the test**
 
 Run: `nvm use && npx vitest run tests/map/profile-hub.test.ts`
 Expected: PASS, 7 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/map/profile/types.ts src/map/profile/hub.ts tests/map/profile-hub.test.ts
@@ -336,7 +336,7 @@ git commit -m "feat(profile): style profile types and the hub theme profile"
 - Consumes: `px` from `./hub.js`; `Box`, `Corners`, `ColumnProfile`, `Ink`, `SectionProfile`, `Shadow` from `./types.js`.
 - Produces: `sectionProfile(settings: Record<string, unknown>, themeSecondary?: string): SectionProfile`; `columnProfile(settings: Record<string, unknown>, siblingCount: number): ColumnProfile`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/map/profile-section.test.ts`:
 
@@ -389,12 +389,12 @@ describe('columnProfile', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to see it fail**
+- [x] **Step 2: Run it to see it fail**
 
 Run: `nvm use && npx vitest run tests/map/profile-section.test.ts`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `section.ts`**
+- [x] **Step 3: Implement `section.ts`**
 
 `src/map/profile/section.ts`:
 
@@ -476,12 +476,12 @@ export function columnProfile(settings: Obj, siblingCount: number): ColumnProfil
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `nvm use && npx vitest run tests/map/profile-section.test.ts`
 Expected: PASS, 6 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/map/profile/section.ts tests/map/profile-section.test.ts
@@ -501,7 +501,7 @@ git commit -m "feat(profile): section padding and ink, column justify and decora
 - Consumes: `LegacySection` from `../../extract/queries.js`; `parseJsonObject` from `../../extract/json.js`; `buttonChromeFrom`, `imageChromeFrom`, `px` from `./hub.js`; types.
 - Produces: `elementProfile(section: LegacySection, hub: HubStyleProfile): ElementProfile`; `visibleGaps(profiles: ElementProfile[]): number[]`; `commonGap(gaps: number[]): number`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/map/profile-element.test.ts`:
 
@@ -579,12 +579,12 @@ describe('rhythm', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to see it fail**
+- [x] **Step 2: Run it to see it fail**
 
 Run: `nvm use && npx vitest run tests/map/profile-element.test.ts`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `element.ts` and `rhythm.ts`**
+- [x] **Step 3: Implement `element.ts` and `rhythm.ts`**
 
 `src/map/profile/element.ts`:
 
@@ -693,12 +693,12 @@ export function commonGap(gaps: number[]): number {
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `nvm use && npx vitest run tests/map/profile-element.test.ts`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/map/profile/element.ts src/map/profile/rhythm.ts tests/map/profile-element.test.ts
@@ -717,7 +717,7 @@ git commit -m "feat(profile): element profiles and the visible-gap rhythm"
 **Interfaces:**
 - Produces: `PlanWarning.type` gains `'fidelity'`; optional `property`, `legacy`, `v3`, `count` on `PlanWarning`. `FidelityEntry { property: string; legacy: string; v3: string; hubWide?: boolean }`; `fidelityWarning(entry, pageSlug: string | null, legacySectionId: number | null): PlanWarning`; `collapseFidelity(warnings: PlanWarning[]): PlanWarning[]`; `snapPx(value: number, allowed: readonly number[]): number`; `STACK_GAP_PX: readonly number[]`; `stackGapSetting(px: number): number`; `FIDELITY_THRESHOLD_PX = 4`.
 
-- [ ] **Step 1: Extend `PlanWarning`**
+- [x] **Step 1: Extend `PlanWarning`**
 
 In `src/map/plan.ts` replace lines 8-13 with:
 
@@ -743,7 +743,7 @@ Then check nothing switches exhaustively on the type:
 Run: `grep -rn "'approximated'" src/apply src/verify src/cli | grep -v "type: 'approximated'"`
 Expected: no `switch`/`case` lines. If a `case` list exists, add `'fidelity'` next to `'approximated'` there.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `tests/map/translate-fidelity.test.ts`:
 
@@ -790,12 +790,12 @@ describe('snapping', () => {
 });
 ```
 
-- [ ] **Step 3: Run it to see it fail**
+- [x] **Step 3: Run it to see it fail**
 
 Run: `nvm use && npx vitest run tests/map/translate-fidelity.test.ts`
 Expected: FAIL, module not found.
 
-- [ ] **Step 4: Implement `fidelity.ts`**
+- [x] **Step 4: Implement `fidelity.ts`**
 
 `src/map/translate/fidelity.ts`:
 
@@ -859,12 +859,12 @@ export function stackGapSetting(snapped: number): number {
 }
 ```
 
-- [ ] **Step 5: Run the test and the typecheck**
+- [x] **Step 5: Run the test and the typecheck**
 
 Run: `nvm use && npx vitest run tests/map/translate-fidelity.test.ts && npm run typecheck`
 Expected: PASS, 6 tests; typecheck clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/map/plan.ts src/map/translate/fidelity.ts tests/map/translate-fidelity.test.ts
@@ -883,7 +883,7 @@ git commit -m "feat(translate): fidelity entries as a plan warning type"
 - Consumes: `surfaceBackgroundFor`, `ThemeColours`, `Surface` from `../style.js` (unchanged); `SectionProfile`, `ColumnProfile`, `Box`, `Corners`, `Ink` from `../profile/types.js`; `FidelityEntry` from `./fidelity.js`.
 - Produces: `paddingShorthand(box: Box): string`; `cornersShorthand(c: Corners): string`; `luminance(hex: string): number`; `inkFor(ink: Ink): { value: 'light' | 'dark' | null; fidelity: FidelityEntry | null }`; `sectionSurface(profile, settings, hidden, theme): { surface: Surface; fidelity: FidelityEntry[] }`; `columnSurface(profile, settings, theme): Surface | null`; `LAYOUT_ROW_SETTINGS`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/map/translate-surface.test.ts`:
 
@@ -951,12 +951,12 @@ describe('LAYOUT_ROW_SETTINGS', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to see it fail**
+- [x] **Step 2: Run it to see it fail**
 
 Run: `nvm use && npx vitest run tests/map/translate-surface.test.ts`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `surface.ts`**
+- [x] **Step 3: Implement `surface.ts`**
 
 `src/map/translate/surface.ts`:
 
@@ -1035,12 +1035,12 @@ export function columnSurface(profile: ColumnProfile, settings: Obj, theme: Them
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `nvm use && npx vitest run tests/map/translate-surface.test.ts`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/map/translate/surface.ts tests/map/translate-surface.test.ts
@@ -1064,7 +1064,7 @@ git commit -m "feat(translate): exact section and column surfaces, ink by lumina
   - `buttonSettings(p: ButtonProfile, legacySettings: Obj, action: { type: string; value: string }, newTab: boolean): { settings: Obj; fidelity: FidelityEntry[] }`
   - `describeButtonChrome(c: ButtonChrome): string`; `V3_LG_BUTTON = 'size lg: 14.4px radius, 14px x 46px, no shadow, weight 400'`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/map/translate-leaf.test.ts`:
 
@@ -1153,12 +1153,12 @@ describe('buttonSettings', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to see it fail**
+- [x] **Step 2: Run it to see it fail**
 
 Run: `nvm use && npx vitest run tests/map/translate-leaf.test.ts`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `leaf.ts`**
+- [x] **Step 3: Implement `leaf.ts`**
 
 `src/map/translate/leaf.ts`:
 
@@ -1260,12 +1260,12 @@ export function buttonSettings(p: ButtonProfile, legacySettings: Obj, action: { 
 
 Note on `button.colours`: the existing `dominantButtonColour` sets the hub primary to the colour most buttons carry, so this entry fires for every coloured button, including the majority ones. Task 8 filters it: the column translator drops `button.colours` entries whose legacy background equals the dominant colour passed in through `MapContext.dominantButtonBackground`.
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `nvm use && npx vitest run tests/map/translate-leaf.test.ts`
 Expected: PASS, 10 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/map/translate/leaf.ts tests/map/translate-leaf.test.ts
@@ -1297,7 +1297,7 @@ export interface ColumnStackArgs {
 export function columnStack(args: ColumnStackArgs): CatalogNode
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `tests/map/translate-stack.test.ts`:
 
@@ -1393,12 +1393,12 @@ describe('columnStack', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to see it fail**
+- [x] **Step 2: Run it to see it fail**
 
 Run: `nvm use && npx vitest run tests/map/translate-stack.test.ts`
 Expected: FAIL, module not found.
 
-- [ ] **Step 3: Implement `stack.ts`**
+- [x] **Step 3: Implement `stack.ts`**
 
 `src/map/translate/stack.ts`:
 
@@ -1480,12 +1480,12 @@ export function columnStack(args: ColumnStackArgs): CatalogNode {
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `nvm use && npx vitest run tests/map/translate-stack.test.ts`
 Expected: PASS, 6 tests. If the hero test's run gap differs, check `commonGap([20, 30])`: gaps inside the run are `[gaps[2], gaps[3]] = [20, 30]`, `commonGap` skips index 0 and returns 30, snapped 32, setting 8.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/map/translate/stack.ts tests/map/translate-stack.test.ts
@@ -1508,7 +1508,7 @@ git commit -m "feat(translate): column stack with button runs and rhythm wrapper
 - `ElementContext` gains `hubProfile?: HubStyleProfile`, `columnContentWidth?: number | null`, `dominantButtonBackground?: string | null`.
 - `mapElement` signature unchanged otherwise. `blockNode` gains a fourth parameter `siblingCount = 1`.
 
-- [ ] **Step 1: Update `elements.ts`**
+- [x] **Step 1: Update `elements.ts`**
 
 Replace the import block's last line and add:
 
@@ -1576,7 +1576,7 @@ Button case: replace the final `return { id, kind: 'button', value: label, setti
       return { id, kind: 'button', value: label, settings: button.settings };
 ```
 
-- [ ] **Step 2: Update `sections.ts`**
+- [x] **Step 2: Update `sections.ts`**
 
 Imports: replace the `./style.js` import with
 
@@ -1666,7 +1666,7 @@ In the "columns of elements" branch, pass the sibling count and the new row sett
 
 and the inner stack `settings: { align: 'start', gap: 5 }` (legacy featured stacks title, description and button 20px apart; 5 = 20px).
 
-- [ ] **Step 3: Update `pages.ts`**
+- [x] **Step 3: Update `pages.ts`**
 
 After line 116 (`const themeColours = ...`) add:
 
@@ -1689,11 +1689,11 @@ In the `ctx` literal add `hubProfile, dominantButtonBackground,` and change `map
         }),
 ```
 
-- [ ] **Step 4: Trim `style.ts`**
+- [x] **Step 4: Trim `style.ts`**
 
 Delete `surfacePaddingFor`, `sectionSurfaceFor`, `columnSurfaceFor`, `layoutRowSettings`, `headlineSettingsFor`, `textSettingsFor`, `imageSettingsFor`, `buttonSettingsFor`. Keep `Surface`, `ThemeColours`, `HEX6`, `surfaceBackgroundFor`, `stackWidthFor`, `BUTTON_ICONS`, `dominantButtonColour`, `instantiateRecipe`. Update the file's header comment to say it holds the shared vocabulary the profile and translate layers use.
 
-- [ ] **Step 5: Typecheck and fix the tests that pinned the old output**
+- [x] **Step 5: Typecheck and fix the tests that pinned the old output**
 
 Run: `nvm use && npm run typecheck`
 Expected: errors only in tests. Then:
@@ -1736,7 +1736,7 @@ describe('shared style vocabulary', () => {
 Run: `nvm use && npx vitest run`
 Expected: everything green. Read every failure; do not delete an assertion without replacing it with the new expected value.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A src/map tests/map tests/fixtures
@@ -1753,7 +1753,7 @@ git commit -m "feat(map): route sections and elements through the profile and tr
 
 **Interfaces:** consumes `mapSection`, `mapElement`, `MapContext`, `nodeId`, `hubStyleProfile`.
 
-- [ ] **Step 1: Write the fixture**
+- [x] **Step 1: Write the fixture**
 
 The ManTalks section 3398809 tree, settings verbatim, copy replaced. `tests/fixtures/sections/hero-row.json`:
 
@@ -1822,7 +1822,7 @@ The ManTalks section 3398809 tree, settings verbatim, copy replaced. `tests/fixt
 }
 ```
 
-- [ ] **Step 2: Write the failing golden test**
+- [x] **Step 2: Write the failing golden test**
 
 `tests/map/hero.test.ts`:
 
@@ -1922,12 +1922,12 @@ describe('the ManTalks home hero', () => {
 
 Note for the implementer: the image overwrites appearance with `cornerRadius.show: true` and no corner values, so its own radius is `[0,0,0,0]` → `control` with an entry; the hub's 30px thumbnail radius does not apply to it. `assetForUrl` resolves the wordmark to a manifest entry, the way the real bundle does, so the image value is the ledger reference and no `approximated` warning fires.
 
-- [ ] **Step 3: Run it**
+- [x] **Step 3: Run it**
 
 Run: `nvm use && npx vitest run tests/map/hero.test.ts`
 Expected: PASS after Task 8. Any failure here is a wiring bug in Task 8, not a reason to change the expectation; the expected tree is the spec's section 5 applied to the hero.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/fixtures/sections/hero-row.json tests/map/hero.test.ts
@@ -1943,7 +1943,7 @@ git commit -m "test(map): the ManTalks home hero as a golden fixture"
 - Modify: `src/cli/map.ts:33, 146-176`
 - Test: `tests/map/branding.test.ts` (add a case), `tests/map/translate-fidelity.test.ts` (already covers collapse)
 
-- [ ] **Step 1: Failing branding test**
+- [x] **Step 1: Failing branding test**
 
 Append to `tests/map/branding.test.ts` (match its existing helper for calling `mapBranding`; the theme argument is a `LegacyHubTheme`):
 
@@ -1960,7 +1960,7 @@ Append to `tests/map/branding.test.ts` (match its existing helper for calling `m
 Run: `nvm use && npx vitest run tests/map/branding.test.ts`
 Expected: FAIL on the new case (type error on the number, or missing key).
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 In `branding.ts` widen the return type `branding: Record<string, string | boolean | number>` (and the local), then after the font family lines:
 
@@ -1975,7 +1975,7 @@ In `branding.ts` widen the return type `branding: Record<string, string | boolea
 
 with `import { px } from './profile/hub.js';`. Run `npm run typecheck`; if the apply layer types branding as `Record<string, string | boolean>`, widen it there too (grep `string | boolean>` in `src/apply` and `src/map/plan.ts`).
 
-- [ ] **Step 3: The map summary**
+- [x] **Step 3: The map summary**
 
 In `src/cli/map.ts`, import `collapseFidelity` from `../map/translate/fidelity.js`. Where the plan literal sets `warnings,`, set `warnings: collapseFidelity(warnings),`. After the `plan written` log add:
 
@@ -1993,12 +1993,12 @@ In `src/cli/map.ts`, import `collapseFidelity` from `../map/translate/fidelity.j
   }
 ```
 
-- [ ] **Step 4: Run everything**
+- [x] **Step 4: Run everything**
 
 Run: `nvm use && npx vitest run && npm run typecheck`
 Expected: all green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/map/branding.ts src/cli/map.ts tests/map/branding.test.ts
@@ -2013,12 +2013,12 @@ git commit -m "feat(map): legacy font sizes into branding; fidelity summary afte
 - Modify: `WORKLOG.md`, `README.md` (the "What M1 does not do" section gains the fidelity limits)
 - Creates: a new `plans/hub-38827-*.json`
 
-- [ ] **Step 1: Map the current bundle**
+- [x] **Step 1: Map the current bundle**
 
 Run: `nvm use && npm run cli -- map bundles/hub-38827-2026-09-11T19-31-09.475Z.json`
 Expected: exit 0, `plan written`, then one `fidelity` line per distinct entry. Record the counts. Expected shape for ManTalks: `button.chrome` 79 (single line, the 0px/13px 30px/shadow large chrome), `image.maxWidth` for the 250/350/370/490/540 widths, `image.radius` for the 22 overwriting images, `section.ink` for the 56 sections with a custom text colour.
 
-- [ ] **Step 2: Inspect the hero in the new plan**
+- [x] **Step 2: Inspect the hero in the new plan**
 
 ```bash
 node -e '
@@ -2029,18 +2029,18 @@ console.log(JSON.stringify(hero,null,1));' plans/<new plan>.json
 
 Expected: `surface.padding: '150px 0'`, `ink: 'light'`, right stack `{ gap: 5, width: '1/2', justify: 'center' }`, headline `{ level: 2, weight: 700, align: 'left' }`, buttons inside a `{ align: 'start', gap: 8 }` stack. If the tree differs from `tests/map/hero.test.ts`, the pages.ts wiring (Task 8 step 3) is not forwarding the profile; fix there.
 
-- [ ] **Step 3: Dry run against the live run**
+- [x] **Step 3: Dry run against the live run**
 
 Run: `nvm use && npm run cli -- apply plans/<new plan>.json --dry-run --resume run-2026-09-11T19-49-29-036Z-b3f055c6 --accept-plan-change --rewrite-pages --skip-assets --publish-held --hub-slug alliance`
 Expected: exit 0; the operation list shows page tree rewrites for the columns pages and no hub, playlist, folder, segment or tag creates. Any `create` of a page means the node ids moved; stop and compare `nodeId` inputs.
 
-- [ ] **Step 4: Docs**
+- [x] **Step 4: Docs**
 
 `WORKLOG.md`: a dated entry with the fidelity counts from step 1, the plan filename, and the sentence "Not applied; the resume is the user's call."
 
 `README.md`, under the M1 limits: a bullet per row of the spec's section 8 table (button chrome, image caps, square images, mobile padding, background position, line-height, h4 size).
 
-- [ ] **Step 5: Commit and stop**
+- [x] **Step 5: Commit and stop**
 
 ```bash
 git add WORKLOG.md README.md

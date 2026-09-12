@@ -72,6 +72,17 @@ type), and `marker` (which run created it).
 - `apply --assets-only` and `apply --mode upsert` both exit with a message naming
   the milestone they belong to.
 - Live calls are not migrated. No legacy table backs them.
+- Button chrome is not carried. V3's button has `variant` and `size` only, so
+  every legacy button lands on `size: lg` (46px tall, 14px sides, 14.4px radius,
+  weight 400); radius, padding, shadow, border and weight from the legacy theme
+  or the element are reported as one `fidelity` warning per distinct chrome.
+- Image caps outside 128/352px snap to the nearest or fill the column; square
+  images get V3's smallest radius (12px); an image border becomes a 1px hairline.
+  Each is a `fidelity` warning with the legacy and V3 values.
+- Section padding is exact at desktop width. Legacy drops its default 50px to
+  30px under 768px; the migrated page keeps the desktop value on mobile.
+- Background position is dropped; V3 centres. Paragraph line-height is V3's 1.3
+  against legacy's 1.5. A small legacy headline (h4, 18px) renders at 20px.
 
 ## Entity types with no revision token
 

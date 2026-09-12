@@ -259,3 +259,36 @@ target (the exemption decision is still with the user). Contact sheet skipped
 (assets pending 2969). The hub member alkein@membership.io joined under 30
 days ago and so sees the First 30 Days hero; a member older than 30 days or
 tagged mantalks-team sees the other one.
+
+## 2026-09-12 (evening): style fidelity
+
+The home hero on hub.member.dev/alliance rendered 64px padding instead of
+150px, centred copy instead of left-aligned, a 42px heading instead of 32px
+and 16px gaps instead of 20/20/30. Root causes, read out of both renderers:
+legacy column `styles.align` is vertical (justify-content), the mapper had
+treated it as horizontal; section padding was snapped to a token although V3's
+`surface.padding` accepts any CSS string; headline `large` was mapped to
+`large-title`; text nodes carried V3's hidden 8px margin.
+
+Built two pure layers under `src/map/profile/` (what the legacy renderer paints,
+in px) and `src/map/translate/` (the nearest V3 settings plus a `fidelity`
+warning for every value V3 cannot draw). Spec and plan under
+docs/superpowers/. 524 tests. Branch `style-fidelity`.
+
+Real map of bundle hub-38827-2026-09-11T19-31-09.475Z: plan
+plans/hub-38827-f0831784bfc4.json, 27 pages, 236 warnings of which 166 are
+fidelity: button.chrome x81 (0px radius, 13px 30px, shadow large, bold ->
+lg), image.radius x69 (30px -> m 24px) and x4 (0px -> control 12px),
+section.ink x55 (#F7F2E8 -> light) and x14 (#333333 -> dark), image.maxWidth
+x22 (370 to 540px in a 600px column, no cap), image.border x1. The home-page
+hero in that plan is `padding: '150px 0'`, `ink: light`, right stack
+`justify: center` at gap 5, headline level 2, buttons in a start-aligned run
+at gap 8. `apply --dry-run --resume run-2026-09-11T19-49-29-036Z-b3f055c6
+--accept-plan-change --rewrite-pages` exits 0 with 3334 operations (the
+dry-run renderer lists plan operations without consulting the ledger, so its
+`page.create` lines are expected on a resume). Not applied; the resume is the
+user's call.
+
+Also fixed on the way: `.gitignore` ignored `docs/superpowers/plans/` through
+an unanchored `plans/`, so the M1 plan doc had never been tracked.
+
