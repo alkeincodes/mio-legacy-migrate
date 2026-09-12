@@ -31,7 +31,7 @@ describe('sectionSurface', () => {
 
   it('carries exact padding, ink, background and visibility for the hero', () => {
     const { surface, fidelity } = sectionSurface(sectionProfile(hero), hero, false, {});
-    expect(surface).toEqual({ padding: '150px 0', ink: 'light', background: { type: 'image', url: 'https://cdn/x.png', blur: false }, visibility: { desktop: true, mobile: false } });
+    expect(surface).toEqual({ padding: '150px 0', ink: 'light', background: { type: 'image', url: 'https://cdn/x.png', blur: false, scrim: false }, visibility: { desktop: true, mobile: false } });
     expect(fidelity).toEqual([{ property: 'section.ink', legacy: '#F7F2E8', v3: 'light' }]);
   });
 
@@ -47,6 +47,11 @@ describe('sectionSurface', () => {
 });
 
 describe('columnSurface', () => {
+  it('turns the scrim off on a column image background too', () => {
+    const settings = { background: { type: 'image', image: { url: 'https://cdn/c.png' } } };
+    expect(columnSurface(columnProfile(settings, 2), settings, {})).toEqual({ background: { type: 'image', url: 'https://cdn/c.png', blur: false, scrim: false } });
+  });
+
   it('is null for an undecorated column and exact px for a decorated one', () => {
     expect(columnSurface(columnProfile({}, 2), {}, {})).toBeNull();
     const settings = { styles: { padding: { show: true, top: 20, bottom: 20, left: 10, right: 10 }, cornerRadius: { show: true, topLeft: 12, topRight: 12, bottomRight: 12, bottomLeft: 12 }, dropShadow: { show: true, size: 'large' } }, background: { type: 'custom-color', color: '#101820' } };

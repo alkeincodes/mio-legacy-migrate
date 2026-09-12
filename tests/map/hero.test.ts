@@ -50,7 +50,7 @@ describe('the ManTalks home hero', () => {
   it('is a row container with exact 150px padding, light ink and the background image', () => {
     expect(node).toMatchObject({
       id: nodeId(HUB, PAGE, 3398809, 1), kind: 'container', template: 'row',
-      settings: { maxWidth: 'content', padding: 0, surface: { padding: '150px 0', ink: 'light', background: { type: 'image', url: 'https://cdn.example.com/hero-bg.png', blur: false }, visibility: { desktop: true, mobile: false } } },
+      settings: { maxWidth: 'content', padding: 0, surface: { padding: '150px 0', ink: 'light', background: { type: 'image', url: 'https://cdn.example.com/hero-bg.png', blur: false, scrim: false }, visibility: { desktop: true, mobile: false } } },
     });
     expect(row?.settings).toEqual({ gap: 5, mobileGap: 6, align: 'stretch', wrap: true, responsive: true });
   });

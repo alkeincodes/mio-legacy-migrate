@@ -173,7 +173,7 @@ describe('settings that arrive already parsed', () => {
     const fixture = loadFixture('row');
     const section = { ...fixture.section, settings: JSON.stringify({ background: { type: 'image', image: 'https://cdn.example.com/bg.png' } }) };
     const node = mapSection(section, 0, contextFor({ ...fixture, section }, []));
-    expect((node.settings?.['surface'] as Record<string, unknown>)['background']).toEqual({ type: 'image', url: 'https://cdn.example.com/bg.png', blur: false });
+    expect((node.settings?.['surface'] as Record<string, unknown>)['background']).toEqual({ type: 'image', url: 'https://cdn.example.com/bg.png', blur: false, scrim: false });
   });
 });
 

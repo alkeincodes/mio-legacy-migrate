@@ -45,6 +45,8 @@ export interface SectionProfile {
   ink: Ink;
   /** The legacy gutter between columns, from the SCSS. */
   gutter: 20;
+  /** Opacity of the tint legacy paints over an image background (its :before layer). */
+  imageOverlayOpacity: number;
 }
 
 export type Justify = 'start' | 'center' | 'end';
@@ -55,6 +57,8 @@ export interface ColumnProfile {
   padding: Box | null;
   radius: Corners | null;
   shadow: Shadow | null;
+  /** As on the section; the column background mirrors the section's variant classes. */
+  imageOverlayOpacity: number;
 }
 
 export type Align = 'left' | 'center' | 'right';

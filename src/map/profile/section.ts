@@ -9,6 +9,13 @@ function obj(value: unknown): Obj | undefined {
 
 const SECTION_BASE: Box = { top: 50, right: 0, bottom: 50, left: 0 };
 
+/**
+ * _common.scss:262-277: `.variant-image:before` is the secondary colour at
+ * `opacity: 0`, so legacy never darkens an image background. There is no
+ * setting for it; the value is the stylesheet's.
+ */
+const IMAGE_OVERLAY_OPACITY = 0;
+
 /** appearance.js:34-53: inline px per side when padding.show, each side with its own default. */
 function paddingFrom(styles: Obj | undefined, defaults: Box): Box | null {
   const padding = obj(styles?.['padding']);
@@ -56,6 +63,7 @@ export function sectionProfile(settings: Obj, themeSecondary?: string): SectionP
     padding: paddingFrom(obj(settings['styles']), SECTION_BASE) ?? { ...SECTION_BASE },
     ink: inkFrom(settings, themeSecondary),
     gutter: 20,
+    imageOverlayOpacity: IMAGE_OVERLAY_OPACITY,
   };
 }
 
@@ -71,5 +79,6 @@ export function columnProfile(settings: Obj, siblingCount: number): ColumnProfil
     padding: paddingFrom(styles, { top: 0, right: 0, bottom: 0, left: 0 }),
     radius: cornersFrom(styles),
     shadow: shadowFrom(styles),
+    imageOverlayOpacity: IMAGE_OVERLAY_OPACITY,
   };
 }

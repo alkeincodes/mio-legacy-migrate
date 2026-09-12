@@ -41,6 +41,16 @@ export function inkFor(ink: Ink): { value: 'light' | 'dark' | null; fidelity: Fi
 /** The inner row every columns section carries: legacy's 20px gutter, stretched columns. */
 export const LAYOUT_ROW_SETTINGS: Readonly<Obj> = Object.freeze({ gap: 5, mobileGap: 6, align: 'stretch', wrap: true, responsive: true });
 
+/**
+ * V3 composes a secondary-tint scrim over every image background unless the
+ * background carries a literal `scrim: false` (node-surface.tsx:110-121).
+ * Legacy paints its overlay at the profile's opacity, 0 in the stylesheet.
+ */
+function withScrim(background: Record<string, unknown> | null, overlayOpacity: number): Record<string, unknown> | null {
+  if (!background || background['type'] !== 'image') return background;
+  return { ...background, scrim: overlayOpacity > 0 };
+}
+
 /** A section's surface: exact padding, ink, background and device visibility. */
 export function sectionSurface(profile: SectionProfile, settings: Obj, hidden: boolean, theme: ThemeColours): { surface: Surface; fidelity: FidelityEntry[] } {
   const fidelity: FidelityEntry[] = [];
@@ -50,7 +60,7 @@ export function sectionSurface(profile: SectionProfile, settings: Obj, hidden: b
   if (ink.fidelity) fidelity.push(ink.fidelity);
   // A legacy section with no background shows the page colour; without an explicit
   // `none` the hero template paints its own default tint instead.
-  surface['background'] = surfaceBackgroundFor(settings['background'] as Obj | undefined, theme) ?? { type: 'none' };
+  surface['background'] = withScrim(surfaceBackgroundFor(settings['background'] as Obj | undefined, theme), profile.imageOverlayOpacity) ?? { type: 'none' };
   const visibility = (settings['styles'] as Obj | undefined)?.['visibility'];
   if (hidden) surface['visibility'] = { desktop: false, mobile: false };
   else if (visibility === 'desktop') surface['visibility'] = { desktop: true, mobile: false };
@@ -63,7 +73,7 @@ const SHADOW: Record<string, string> = { small: 'sm', medium: 'md', large: 'lg' 
 /** A column's own decoration as a stack surface, or null when it has none. */
 export function columnSurface(profile: ColumnProfile, settings: Obj, theme: ThemeColours): Surface | null {
   const surface: Surface = {};
-  const background = surfaceBackgroundFor(settings['background'] as Obj | undefined, theme);
+  const background = withScrim(surfaceBackgroundFor(settings['background'] as Obj | undefined, theme), profile.imageOverlayOpacity);
   if (background) surface['background'] = background;
   if (profile.padding) surface['padding'] = paddingShorthand(profile.padding);
   if (profile.radius) surface['borderRadius'] = cornersShorthand(profile.radius);

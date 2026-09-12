@@ -3,7 +3,7 @@ import type { CatalogNode } from '../../src/map/catalog.js';
 import type { ColumnProfile, ElementProfile } from '../../src/map/profile/types.js';
 import { columnStack, type PlacedElement } from '../../src/map/translate/stack.js';
 
-const column: ColumnProfile = { widthPct: 50, justify: 'center', padding: null, radius: null, shadow: null };
+const column: ColumnProfile = { widthPct: 50, justify: 'center', padding: null, radius: null, shadow: null, imageOverlayOpacity: 0 };
 const mintId = (legacyId: number, n: number): string => `w-${legacyId}-${n}`;
 
 function placed(legacyId: number, profile: Partial<ElementProfile> & { kind: ElementProfile['kind'] }, node: Partial<CatalogNode> = {}): PlacedElement {

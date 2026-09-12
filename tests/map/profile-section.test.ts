@@ -20,6 +20,11 @@ describe('sectionProfile', () => {
     expect(sectionProfile({ background: { type: 'default' }, textTheme: 'dark' }).ink).toBeNull();
     expect(sectionProfile({ background: { type: 'image' } }).ink).toBe('light');
   });
+
+  it('records that legacy paints no tint over an image background, on sections and columns alike', () => {
+    expect(sectionProfile({ background: { type: 'image' } }).imageOverlayOpacity).toBe(0);
+    expect(columnProfile({}, 1).imageOverlayOpacity).toBe(0);
+  });
 });
 
 describe('columnProfile', () => {
