@@ -357,3 +357,28 @@ a budget-stopped run the ledger is modified and MUST be committed before the
 next apply, or the clean-ledger gate refuses it (an earlier queued apply died
 on that with a misleading green wrapper exit).
 
+## 2026-09-12 (late): tile links and playlist thumbnails
+
+Legacy grid/scroll tiles are image-only anchors (`showTitle: false`, the
+whole tile is the link; CustomGridBlock.vue). V3 has no clickable image tile
+(content-card navigates only via a data-source scope), so the mapper had
+emitted a full-width lg button labelled "Open" under every tile. Now: the
+picture, the title only when legacy shows one (titles are TipTap documents,
+read through parseDoc), and a compact secondary link button only when the
+tile goes somewhere, labelled with the legacy label, else the tile title,
+else the target page's title (new `pageTitleById`) or the url host; a `#`
+tile is just the picture. Fidelity `tile.link` records the button per tile
+(23 of them link straight to cdn.membership.io files and are labelled with
+the host; a friendlier label is the user's call). Playlist covers: V3
+`cover_url` is read-only and derived from the playlist's files, so covers
+appear when the assets land; legacy playlists may also own a
+`featured-images` thumbnail, which the extract never requested (media owners
+were Hub, File, Section, Page). Playlist owners added to `fetchMedia`; a
+re-extract through the box tunnel is pending. 529 tests.
+
+Plans 892840274b74 (15:38Z) and 28de970ab0b1 (15:49Z) applied, exit 0.
+Live: Begin Training shows three playlist tiles with titles and links,
+the Attachment tile with a "Training: Attachment" link, two picture-only
+tiles. Radar artifact of all recorded limitations:
+https://claude.ai/code/artifact/c8596a7b-c09a-4839-a8e1-829e5744db52
+
