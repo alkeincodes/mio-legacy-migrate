@@ -391,3 +391,14 @@ so it is recorded as lost, with its target, under fidelity `tile.link`
 legacy draws one there. Plan hub-38827-c616706e9326 applied 15:54Z, exit 0,
 6 pages rewritten. 529 tests.
 
+## 2026-09-13: white edge on images
+
+Every migrated image showed a pale sliver on its right edge. V3's Thumbnail
+paints an opaque `bg-background` fill under the picture (MIO-288); with
+`objectFit: contain` the image keeps its own ratio and can be a sub-pixel
+narrower than its box, so a device pixel of white shows. Legacy paints
+nothing under an <img>, and V3 has the setting for that: `backdrop: false`
+(MIO-3086), which the translator had set only for transparent PNGs. Now set
+for every legacy image. Plan hub-38827-b764036a1e45 applied 16:00Z, 10 pages
+rewritten; the wrapper is `bg-transparent` on the live hub.
+
