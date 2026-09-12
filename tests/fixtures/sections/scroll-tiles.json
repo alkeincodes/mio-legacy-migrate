@@ -1,0 +1,18 @@
+{
+  "section": {
+    "id": 4289646, "hub_id": 38827, "page_id": 386957, "parent_id": null,
+    "model_type": null, "model_id": null, "hidden": null, "type": "scroll",
+    "title": "Begin Training", "label": null,
+    "settings": "{\"title\":{\"show\":true},\"background\":{\"type\":\"custom-color\",\"color\":\"#333333\"}}",
+    "permissions": null, "meta": null, "position": 2, "segment_id": null
+  },
+  "children": [
+    { "id": 4289647, "hub_id": 38827, "page_id": null, "parent_id": 4289646, "model_type": "App\\Playlist", "model_id": 323878, "hidden": null, "type": "grid-playlist", "title": null, "label": null, "settings": "{}", "permissions": null, "meta": null, "position": 1, "segment_id": null },
+    { "id": 4289648, "hub_id": 38827, "page_id": null, "parent_id": 4289646, "model_type": "App\\Playlist", "model_id": 333638, "hidden": null, "type": "grid-playlist", "title": null, "label": null, "settings": "{}", "permissions": null, "meta": null, "position": 2, "segment_id": null },
+    { "id": 4289649, "hub_id": 38827, "page_id": null, "parent_id": 4289646, "model_type": "App\\Playlist", "model_id": 345761, "hidden": null, "type": "grid-playlist", "title": null, "label": null, "settings": "{}", "permissions": null, "meta": null, "position": 3, "segment_id": null },
+    { "id": 4289652, "hub_id": 38827, "page_id": null, "parent_id": 4289646, "model_type": "App\\Page", "model_id": 418149, "hidden": null, "type": "grid-page", "title": "Compass", "label": null, "settings": "{\"link\":{\"label\":\"Compass\"}}", "permissions": null, "meta": null, "position": 4, "segment_id": null },
+    { "id": 4289650, "hub_id": 38827, "page_id": null, "parent_id": 4289646, "model_type": null, "model_id": null, "hidden": null, "type": "grid-url", "title": null, "label": null, "settings": "{\"link\":{\"label\":\"Book a call\",\"url\":\"https://example.com/book\"}}", "permissions": null, "meta": null, "position": 5, "segment_id": null },
+    { "id": 4289651, "hub_id": 38827, "page_id": null, "parent_id": 4289646, "model_type": null, "model_id": null, "hidden": null, "type": "grid-url", "title": null, "label": null, "settings": "{\"link\":{\"label\":\"Shop\",\"url\":\"https://example.com/shop\"}}", "permissions": null, "meta": null, "position": 6, "segment_id": null }
+  ],
+  "grandchildren": []
+}

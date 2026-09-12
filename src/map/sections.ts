@@ -146,7 +146,9 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext, sibli
   }
 
   if (block.type.endsWith('-playlist')) {
-    // Playlist cards are data-bound at the section level (see mapSection); a lone block still binds a card.
+    // Legacy carousel and search list a playlist's files (Carousel.vue, Search.vue);
+    // every other playlist block is a tile for the playlist itself.
+    if (block.type !== 'carousel-playlist' && block.type !== 'search-playlist') return playlistTile(block, ordinal, ctx);
     return {
       id,
       kind: 'content-card',
@@ -217,6 +219,29 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext, sibli
     .map((child, i) => ctx.mapElement(child, i))
     .filter((n): n is CatalogNode => n !== null);
   return { id, kind: 'stack', settings: { gap: 4, width: 'full' }, children };
+}
+
+/**
+ * One legacy playlist tile (CustomGridBlock.vue: thumbnail and title linking to
+ * the playlist) in the catalog's scroll/grid card shape. The card binds the
+ * playlist WITHOUT repeat, so V3 resolves the collection scope (the playlist's
+ * own title, cover and click-through, mio-hub renderer.tsx DataBoundContainer).
+ */
+function playlistTile(block: LegacySection, ordinal: number, ctx: MapContext): CatalogNode {
+  const mint = (n: number): string => nodeId(ctx.legacyHubId, ctx.legacyPageId, block.id, ordinal + EXTRA_ORDINAL_BASE + n);
+  return {
+    id: nodeId(ctx.legacyHubId, ctx.legacyPageId, block.id, ordinal),
+    kind: 'content-card',
+    template: 'content-card',
+    settings: { actionFromScope: 'action' },
+    dataSource: { type: 'playlist', id: playlistRef(block.model_id ?? 0) },
+    children: [
+      { id: mint(0), kind: 'media-slot', settings: { name: 'cover', aspectRatio: '16:9', radius: 'm', outline: true } },
+      { id: mint(1), kind: 'stack', settings: { gap: 0.5 }, children: [
+        { id: mint(2), kind: 'field', settings: { name: 'title', role: 'title', size: 'body', weight: 700 } },
+      ] },
+    ],
+  };
 }
 
 /** The section container every catalog recipe starts with. */
@@ -294,16 +319,20 @@ export function mapSection(section: LegacySection, ordinal: number, ctx: MapCont
 
   const legacyChildren = ctx.childrenOf(section.id);
   const playlistBlocks = legacyChildren.filter((c) => c.type.endsWith('-playlist') && c.model_id !== null);
+  const titleDoc = parseDoc(section.title);
+  const titleShown = (settings['title'] as Record<string, unknown> | undefined)?.['show'] !== false;
+  const titleText = titleDoc ? docToText(titleDoc) : (section.title ?? '');
+  const titleNode: CatalogNode | null = titleShown && titleText
+    ? { id: mint(9), kind: 'headline', value: titleText, settings: { level: 2, weight: 700 } }
+    : null;
+  // Legacy grid, scroll and content-grid sections draw one tile per block
+  // (Grid.vue, Scroll.vue, ContentGrid.vue via CustomGridBlock); compact,
+  // playlist, recently-watched and carousel list one playlist's files.
+  const drawsTiles = section.type === 'grid' || section.type === 'scroll' || section.type === 'content-grid';
 
-  // A grid or strip of playlists takes the catalog's own data-bound recipe, one per playlist.
-  if (playlistBlocks.length > 0 && (mapping.template === 'grid' || mapping.template === 'compact' || mapping.template === 'carousel' || mapping.template === 'content-grid')) {
+  // A strip of one playlist's files takes the catalog's own data-bound recipe.
+  if (playlistBlocks.length > 0 && !drawsTiles && (mapping.template === 'grid' || mapping.template === 'compact' || mapping.template === 'carousel' || mapping.template === 'content-grid')) {
     const recipeName = mapping.template === 'compact' ? 'compact-playlist' : 'grid-playlist';
-    const titleDoc = parseDoc(section.title);
-    const titleShown = (settings['title'] as Record<string, unknown> | undefined)?.['show'] !== false;
-    const titleText = titleDoc ? docToText(titleDoc) : (section.title ?? '');
-    const titleNode: CatalogNode | null = titleShown && titleText
-      ? { id: mint(9), kind: 'headline', value: titleText, settings: { level: 2, weight: 700 } }
-      : null;
     if (playlistBlocks.length === 1) {
       const node = bindPlaylist(recipe(recipeName, ctx, section.id), playlistRef(playlistBlocks[0]!.model_id!));
       node.id = id;
@@ -319,13 +348,18 @@ export function mapSection(section: LegacySection, ordinal: number, ctx: MapCont
     ]);
   }
 
-  const cardBlocks = legacyChildren.filter((c) => /-(url|page|file|cta)$/.test(c.type));
+  // Tiles in legacy order: playlists, pages, urls, files and ctas side by side,
+  // laid out as the catalog's Scroll (compact) and Grid starters do: a stack of
+  // the title and the strip or grid.
+  const cardBlocks = legacyChildren.filter((c) => /-(url|page|file|cta)$/.test(c.type) || (c.type.endsWith('-playlist') && c.model_id !== null));
   if (cardBlocks.length > 0 && (mapping.template === 'grid' || mapping.template === 'compact' || mapping.template === 'carousel' || mapping.template === 'content-grid')) {
     const cards = cardBlocks.map((block, i) => blockNode(block, i, ctx));
     const wrap: CatalogNode = mapping.template === 'compact'
       ? { id: mint(0), kind: 'horizontal-scroll', settings: { itemWidth: 'card' }, children: cards }
       : { id: mint(0), kind: 'grid', settings: { variant: 'responsive' }, children: cards };
-    return sectionContainer(id, mapping.template, surface, [wrap]);
+    return sectionContainer(id, mapping.template, surface, [
+      { id: mint(1), kind: 'stack', settings: { gap: 6 }, children: [...(titleNode ? [titleNode] : []), wrap] },
+    ]);
   }
 
   // Everything else is columns of elements: the catalog's row recipe.

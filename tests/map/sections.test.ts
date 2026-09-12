@@ -19,6 +19,11 @@ function loadFixture(name: string): Fixture {
   ) as Fixture;
 }
 
+/** The cards of a tile section: container -> stack(title, strip|grid) -> cards. */
+function cardsOf(node: CatalogNode): CatalogNode[] | undefined {
+  return node.children?.[0]?.children?.find((c) => c.kind === 'grid' || c.kind === 'horizontal-scroll')?.children;
+}
+
 function contextFor(fixture: Fixture, warnings: PlanWarning[]): MapContext {
   const all = [...fixture.children, ...fixture.grandchildren];
   return {
@@ -95,17 +100,29 @@ describe('mapSection, container level', () => {
     expect(node.settings).toMatchObject({ maxWidth: 'content', padding: 0, surface: { padding: '50px 0', background: { type: 'custom-color', value: '#101820' } } });
   });
 
-  it('maps a grid of one playlist onto the catalog playlist-grid recipe bound to that playlist', () => {
+  it('maps a grid of one playlist onto one tile bound to that playlist, not a listing of its files', () => {
     const fixture = loadFixture('grid-playlist');
     const node = mapSection(fixture.section, 1, contextFor(fixture, []));
     expect(node.template).toBe('grid');
-    expect(node.dataSource).toEqual({ type: 'playlist', id: playlistRef(42) });
+    expect(node.dataSource).toBeUndefined();
     const walk = (n: CatalogNode): CatalogNode[] => [n, ...(n.children ?? []).flatMap(walk)];
-    const repeated = walk(node).find((n) => n.repeat);
-    expect(repeated?.dataSource).toEqual({ type: 'playlist', id: playlistRef(42) });
-    expect(walk(node).some((n) => n.kind === 'media-slot')).toBe(true);
+    expect(walk(node).some((n) => n.repeat)).toBe(false);
+    const tile = walk(node).find((n) => n.kind === 'content-card');
+    expect(tile?.dataSource).toEqual({ type: 'playlist', id: playlistRef(42) });
+    expect(tile?.settings).toEqual({ actionFromScope: 'action' });
+    expect(walk(tile!).some((n) => n.kind === 'media-slot')).toBe(true);
     const ids = walk(node).map((n) => n.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('a compact section keeps the catalog playlist recipe, because legacy Compact.vue lists one playlist\'s files', () => {
+    const fixture = loadFixture('grid-playlist');
+    const section = { ...fixture.section, type: 'compact' };
+    const node = mapSection(section, 1, contextFor({ ...fixture, section }, []));
+    expect(node.template).toBe('compact');
+    expect(node.dataSource).toEqual({ type: 'playlist', id: playlistRef(42) });
+    const walk = (n: CatalogNode): CatalogNode[] => [n, ...(n.children ?? []).flatMap(walk)];
+    expect(walk(node).some((n) => n.repeat)).toBe(true);
   });
 
   it('never sets both value and children on a container', () => {
@@ -182,7 +199,7 @@ describe('page and url cards with real legacy shapes', () => {
     const fixture = loadFixture('grid-page');
     const card = { ...fixture.children[0]!, model_type: 'App\\Page', model_id: 284465, settings: JSON.stringify({ link: { label: 'Start' } }) };
     const node = mapSection(fixture.section, 0, { ...contextFor({ ...fixture, children: [card] }, []), pageSlugById: (id) => (id === 284465 ? 'start-here' : null) });
-    const button = node.children?.[0]?.children?.[0]?.children?.find((c) => c.kind === 'button');
+    const button = cardsOf(node)?.[0]?.children?.find((c) => c.kind === 'button');
     expect(button?.value).toBe('Start');
     expect(button?.settings?.['action']).toEqual({ type: 'page', value: '/start-here' });
   });
@@ -191,7 +208,7 @@ describe('page and url cards with real legacy shapes', () => {
     const fixture = loadFixture('grid-url');
     const doc = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'https://x.example.com/a' }] }] });
     const card = { ...fixture.children[0]!, settings: JSON.stringify({ link: { url: doc, label: 'Go', newTab: true } }) };
-    const button = mapSection(fixture.section, 0, contextFor({ ...fixture, children: [card] }, [])).children?.[0]?.children?.[0]?.children?.find((c) => c.kind === 'button');
+    const button = cardsOf(mapSection(fixture.section, 0, contextFor({ ...fixture, children: [card] }, [])))?.[0]?.children?.find((c) => c.kind === 'button');
     expect(button?.settings?.['action']).toEqual({ type: 'url', value: 'https://x.example.com/a' });
     expect(button?.settings?.['newTab']).toBe(true);
   });
@@ -201,7 +218,7 @@ describe('file cards', () => {
   it('reference the asset rather than the legacy file id, which V3 would 404 on', () => {
     const fixture = loadFixture('grid-file');
     const node = mapSection(fixture.section, 0, { ...contextFor(fixture, []), mediaIdForSection: () => 91234 });
-    expect(node.children?.[0]?.children?.[0]?.dataSource).toEqual({ type: 'file', id: 'ledger://asset/91234/original' });
+    expect(cardsOf(node)?.[0]?.dataSource).toEqual({ type: 'file', id: 'ledger://asset/91234/original' });
   });
 });
 
@@ -209,6 +226,35 @@ describe('playlist section titles', () => {
   it('keeps the legacy section title as a headline above the playlist recipe', () => {
     const fixture = loadFixture('grid-playlist');
     const node = mapSection({ ...fixture.section, title: 'Begin Training' }, 1, contextFor(fixture, []));
-    expect(node.children?.[0]).toMatchObject({ kind: 'headline', value: 'Begin Training' });
+    expect(node.children?.[0]?.children?.[0]).toMatchObject({ kind: 'headline', value: 'Begin Training' });
   });
 });
+
+describe('a legacy scroll of tiles (ManTalks Begin Training)', () => {
+  it('is the catalog Scroll section: title and a horizontal strip of six cards in legacy order, playlists bound without repeat', () => {
+    const fixture = loadFixture('scroll-tiles');
+    const warnings: PlanWarning[] = [];
+    const node = mapSection(fixture.section, 2, { ...contextFor(fixture, warnings), pageSlugById: (id) => (id === 418149 ? 'compass' : null) });
+    expect(node.template).toBe('compact');
+    const body = node.children?.[0];
+    expect(body?.kind).toBe('stack');
+    expect(body?.children?.[0]).toMatchObject({ kind: 'headline', value: 'Begin Training' });
+    const strip = body?.children?.[1];
+    expect(strip?.kind).toBe('horizontal-scroll');
+    expect(strip?.settings).toEqual({ itemWidth: 'card' });
+    const cards = strip?.children ?? [];
+    expect(cards.map((c) => c.dataSource?.type ?? c.children?.find((k) => k.kind === 'button')?.settings?.['action'])).toEqual([
+      'playlist', 'playlist', 'playlist',
+      { type: 'page', value: '/compass' },
+      { type: 'url', value: 'https://example.com/book' },
+      { type: 'url', value: 'https://example.com/shop' },
+    ]);
+    for (const card of cards.slice(0, 3)) {
+      expect(card.repeat).toBeUndefined();
+      expect(card.children?.map((k) => k.kind)).toEqual(['media-slot', 'stack']);
+    }
+    expect(cards[0]?.dataSource).toEqual({ type: 'playlist', id: playlistRef(323878) });
+    expect(warnings.filter((w) => w.type !== 'fidelity')).toEqual([]);
+  });
+});
+
