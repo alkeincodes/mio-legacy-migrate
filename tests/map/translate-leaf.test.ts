@@ -24,7 +24,7 @@ describe('textSettings', () => {
 describe('imageSettings', () => {
   const image = (over: Partial<ImageProfile>): ImageProfile => ({ ...base, kind: 'image', maxWidth: null, fill: false, chrome: DEFAULT_HUB_PROFILE.thumbnail, transparent: false, align: 'center', ...over });
 
-  it('the hero wordmark: 250 snaps to 352 with an entry, transparent drops the backdrop, 30px corners are m', () => {
+  it('the hero wordmark: 250 snaps to 352 with an entry, no backdrop under any image, 30px corners are m', () => {
     const p = image({ maxWidth: 250, transparent: true, chrome: { radius: [30, 30, 30, 30], border: null, shadow: null } });
     expect(imageSettings(p, 'Wordmark', 600)).toEqual({
       settings: { alt: 'Wordmark', aspectRatio: 'auto', objectFit: 'contain', alignX: 'center', maxWidth: 352, radius: 'm', backdrop: false },
@@ -41,7 +41,7 @@ describe('imageSettings', () => {
 
   it('square legacy images cannot be drawn: control (12px) with an entry; 128 and near-352 caps are exact', () => {
     expect(imageSettings(image({ maxWidth: 120, align: 'left' }), 'x', null)).toEqual({
-      settings: { alt: 'x', aspectRatio: 'auto', objectFit: 'contain', alignX: 'start', maxWidth: 128, radius: 'control' },
+      settings: { alt: 'x', aspectRatio: 'auto', objectFit: 'contain', alignX: 'start', maxWidth: 128, radius: 'control', backdrop: false },
       fidelity: [{ property: 'image.radius', legacy: '0px', v3: 'control (12px)' }],
     });
     expect(imageSettings(image({ maxWidth: 350, chrome: { radius: [14, 14, 14, 14], border: null, shadow: null } }), 'x', null).fidelity).toEqual([]);

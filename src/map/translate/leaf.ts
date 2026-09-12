@@ -56,7 +56,11 @@ export function imageSettings(p: ImageProfile, alt: string, columnContentWidth: 
     fidelity.push({ property: 'image.radius', legacy: `${legacyRadius}px`, v3: `${radius.name} (${radius.px}px)` });
   }
 
-  if (p.transparent) settings['backdrop'] = false;
+  // Legacy paints nothing under an <img>; V3's Thumbnail paints an opaque
+  // bg-background fill (MIO-288) that shows as a pale edge wherever the
+  // contained image is a sub-pixel narrower than its box. backdrop: false
+  // (MIO-3086) is the setting for that, for every image, not only transparent ones.
+  settings['backdrop'] = false;
   if (p.chrome.border) {
     settings['outline'] = true;
     const b = p.chrome.border;
