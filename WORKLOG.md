@@ -327,3 +327,33 @@ drift the day the hub primary changes. Reverted (653b979), README rule
 restated, plan f0831784bfc4 re-applied (resume, exit 0). Live buttons are
 V3's lg again; `button.chrome` fidelity entry back, count 81.
 
+## 2026-09-12 (night): image scrim off, grid and scroll tiles
+
+Two more hero-page gaps. (1) The hero background was darker than legacy:
+V3 composes a secondary-tint scrim over every image background unless the
+background carries a literal `scrim: false` (node-surface.tsx:110-121);
+legacy `_common.scss:262-277` paints its `.variant-image:before` at opacity
+0. The section and column profiles now carry `imageOverlayOpacity: 0` from
+the stylesheet and the translator emits `scrim: false` on image backgrounds.
+(2) "Begin Training" rendered as a bare headline. The mapper had treated
+playlist blocks inside grid/scroll sections like legacy Compact.vue ("list
+this playlist's files"), emitting cards with `repeat` over a playlist source,
+which V3 resolves to the playlist's FILES (all empty until assets land), and
+it silently dropped the page and url tiles beside them. Legacy Grid.vue and
+Scroll.vue draw one tile per block (CustomGridBlock.vue); V3 already has that
+shape: a content-card bound to a playlist WITHOUT repeat gets the collection
+scope (title, cover, click-through; renderer.tsx DataBoundContainer,
+MIO-2335). `mapSection` now maps every block of a grid/scroll/content-grid
+section in legacy order into the catalog Scroll (compact) or Grid starter
+shape; compact/playlist/recently-watched/carousel keep the file-listing
+recipes. Fixture `scroll-tiles.json` is the real section. 528 tests.
+
+Applied plan hub-38827-d0b4d3a69ade (resume, exit 0) at 15:29Z. Live:
+Begin Training is a 446px Scroll section with six cards, playlist titles and
+playlist hrefs present, covers placeholder until the asset copy. Two
+operational lessons: the tool budgets 60 page publishes an hour and a full
+apply republishes 27 pages, so at most two full applies per hour; and after
+a budget-stopped run the ledger is modified and MUST be committed before the
+next apply, or the clean-ledger gate refuses it (an earlier queued apply died
+on that with a misleading green wrapper exit).
+
