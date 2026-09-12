@@ -295,3 +295,25 @@ Buttons are 46px tall, 10px radius, weight 400 (the recorded limit).
 Also fixed on the way: `.gitignore` ignored `docs/superpowers/plans/` through
 an unanchored `plans/`, so the M1 plan doc had never been tracked.
 
+## 2026-09-12 (night): button chrome shell
+
+The user flagged that the migrated buttons still had rounded corners where
+legacy draws 0px. V3 has no radius knob anywhere: the button carries both
+`rounded-lg` (10px, winning) and `rounded-control-lg`; `--control-radius-base`
+and `--hub-radius-m` are constants in globals.css that no hub data feeds, and
+the backend has no radius key. Mocked a fix on the live page in the browser
+first: wrap the button in a shrink-wrapped stack whose surface is the fill
+colour with `borderRadius: '0'`, `padding: '2px 16px'`, `clip: true` and the
+legacy shadow. The V3 button's rounded fill sits inside a same-coloured square
+box, so the visible shape is legacy's 50px by (w+32) rectangle and hover stays
+clean. Built as `buttonShell()` in translate/leaf.ts; `mapElement` and the
+featured band now return the shell stack with the button as its child; the
+shell colour is the hex the V3 primary renders (dominant legacy button colour,
+else the theme primary, else V3's default). Fidelity for buttons shrinks to
+`button.weight 700 -> 400` (81) plus `button.border` when legacy had one.
+527 tests.
+
+Plan plans/hub-38827-dacb2cffe88e.json applied (resume, exit 0). Live:
+shells 171x50 and 219x50, radius 0, fill #5770D1, overflow hidden, shadow on,
+32px apart. Screenshot matches the legacy hero apart from the weight.
+
