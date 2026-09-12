@@ -13,6 +13,9 @@ const fixture = JSON.parse(readFileSync(new URL('../fixtures/sections/hero-row.j
 const HUB = 38827;
 const PAGE = 280338;
 const EXTRA = 1000;
+const SHELL = 2000;
+/** The legacy chrome (square, 13px 30px, large shadow) as the shell around each V3 button. */
+const shell = { width: 'fit', gap: 0, surface: { background: { type: 'custom-color', value: '#5770D1' }, borderRadius: '0', padding: '2px 16px', clip: true, shadow: 'lg' } };
 
 const hubProfile = hubStyleProfile({
   colors: { primary: '#F7F2E8', secondary: '#333333' },
@@ -33,6 +36,7 @@ function ctx(warnings: PlanWarning[]): MapContext {
     themeColours: { primary: '#F7F2E8', secondary: '#333333' },
     hubProfile,
     dominantButtonBackground: '#5770D1',
+    buttonFillHex: '#5770D1',
   };
   return {
     ...base,
@@ -70,8 +74,12 @@ describe('the ManTalks home hero', () => {
       {
         id: nodeId(HUB, PAGE, 3424620, EXTRA), kind: 'stack', settings: { align: 'start', gap: 8 },
         children: [
-          { id: nodeId(HUB, PAGE, 3424620, 2), kind: 'button', value: 'Join The Conversation', settings: { action: { type: 'page', value: '/discussions' }, variant: 'primary', size: 'lg', newTab: false, iconRight: 'chat' } },
-          { id: nodeId(HUB, PAGE, 4048781, 3), kind: 'button', value: '5-Day Challenge', settings: { action: { type: 'page', value: '/5d-challenge' }, variant: 'primary', size: 'lg', newTab: false, iconRight: 'activity' } },
+          { id: nodeId(HUB, PAGE, 3424620, SHELL + 2), kind: 'stack', settings: shell, children: [
+            { id: nodeId(HUB, PAGE, 3424620, 2), kind: 'button', value: 'Join The Conversation', settings: { action: { type: 'page', value: '/discussions' }, variant: 'primary', size: 'lg', newTab: false, iconRight: 'chat' } },
+          ] },
+          { id: nodeId(HUB, PAGE, 4048781, SHELL + 3), kind: 'stack', settings: shell, children: [
+            { id: nodeId(HUB, PAGE, 4048781, 3), kind: 'button', value: '5-Day Challenge', settings: { action: { type: 'page', value: '/5d-challenge' }, variant: 'primary', size: 'lg', newTab: false, iconRight: 'activity' } },
+          ] },
         ],
       },
     ]);
@@ -83,8 +91,8 @@ describe('the ManTalks home hero', () => {
       ['section.ink', '#F7F2E8', 'light'],
       ['image.maxWidth', '250px', '352px'],
       ['image.radius', '0px', 'control (12px)'],
-      ['button.chrome', '0px radius, 13px 30px, shadow large, weight 700', 'size lg: 14.4px radius, 14px x 46px, no shadow, weight 400'],
-      ['button.chrome', '0px radius, 13px 30px, shadow large, weight 700', 'size lg: 14.4px radius, 14px x 46px, no shadow, weight 400'],
+      ['button.weight', '700', '400'],
+      ['button.weight', '700', '400'],
     ]);
     expect(warnings.filter((w) => w.type !== 'fidelity').map((w) => w.reason)).toEqual([]);
   });

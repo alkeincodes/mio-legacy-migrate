@@ -12,7 +12,7 @@ import { elementProfile } from './profile/element.js';
 import { DEFAULT_HUB_PROFILE } from './profile/hub.js';
 import type { ButtonProfile, HubStyleProfile } from './profile/types.js';
 import { fidelityWarning } from './translate/fidelity.js';
-import { buttonSettings } from './translate/leaf.js';
+import { buttonSettings, buttonShell } from './translate/leaf.js';
 import { columnStack, type PlacedElement } from './translate/stack.js';
 import { LAYOUT_ROW_SETTINGS, columnSurface, sectionSurface } from './translate/surface.js';
 
@@ -32,6 +32,8 @@ export interface MapContext {
   hubProfile?: HubStyleProfile;
   /** The button background the hub primary was set to. */
   dominantButtonBackground?: string | null;
+  /** The hex the V3 primary button fill renders, for the chrome shell around each legacy button. */
+  buttonFillHex?: string;
   /** The V3 slug for a legacy page slug, when the mapper renamed it. */
   resolvePageSlug?(legacySlug: string): string;
   /** The V3 slug of a legacy page by id, for cards whose target is a page row. */
@@ -247,9 +249,15 @@ function featuredSection(section: LegacySection, id: string, settings: Record<st
       : section.model_type?.endsWith('Page') && section.model_id !== null
         ? { type: 'page', value: `/${ctx.pageSlugById?.(section.model_id) ?? ''}` }
         : { type: 'url', value: '' };
-    const featuredButton = buttonSettings(hubButtonProfile(ctx.hubProfile ?? DEFAULT_HUB_PROFILE), settings, action, false);
+    const featuredProfile = hubButtonProfile(ctx.hubProfile ?? DEFAULT_HUB_PROFILE);
+    const featuredButton = buttonSettings(featuredProfile, settings, action, false);
     for (const entry of featuredButton.fidelity) ctx.warn(fidelityWarning(entry, ctx.pageSlug, section.id));
-    stack.push({ id: mint(3), kind: 'button', value: buttonLabel, settings: featuredButton.settings });
+    stack.push({
+      id: mint(6),
+      kind: 'stack',
+      settings: buttonShell(featuredProfile, ctx.buttonFillHex ?? '#F7B01E'),
+      children: [{ id: mint(3), kind: 'button', value: buttonLabel, settings: featuredButton.settings }],
+    });
   }
   const image = cardImage(settings, ctx);
   const rowChildren: CatalogNode[] = [];

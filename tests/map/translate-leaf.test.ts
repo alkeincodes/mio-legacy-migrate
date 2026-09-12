@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_HUB_PROFILE, hubStyleProfile } from '../../src/map/profile/hub.js';
 import type { ButtonProfile, HeadlineProfile, ImageProfile, TextProfile } from '../../src/map/profile/types.js';
-import { V3_LG_BUTTON, buttonSettings, describeButtonChrome, headlineSettings, imageSettings, textSettings } from '../../src/map/translate/leaf.js';
+import { V3_LG_BUTTON, buttonSettings, buttonShell, describeButtonChrome, headlineSettings, imageSettings, textSettings } from '../../src/map/translate/leaf.js';
 
 const base = { align: 'left' as const, marginTop: 0, bottomMargin: 0 };
 
@@ -62,12 +62,17 @@ describe('buttonSettings', () => {
     expect(V3_LG_BUTTON).toBe('size lg: 14.4px radius, 14px x 46px, no shadow, weight 400');
   });
 
-  it('emits lg with the icon and a hub-wide chrome entry', () => {
+  it('emits lg with the icon and a hub-wide weight entry; the chrome itself goes to the shell', () => {
     const legacy = { button: { icon: { show: true, alignment: 'right', illustration: { icon: 'chat' } } } };
     expect(buttonSettings(button({}), legacy, { type: 'page', value: '/discussions' }, false)).toEqual({
       settings: { action: { type: 'page', value: '/discussions' }, variant: 'primary', size: 'lg', newTab: false, iconRight: 'chat' },
-      fidelity: [{ property: 'button.chrome', legacy: '0px radius, 13px 30px, shadow large, weight 700', v3: V3_LG_BUTTON, hubWide: true }],
+      fidelity: [{ property: 'button.weight', legacy: '700', v3: '400', hubWide: true }],
     });
+  });
+
+  it('reports a legacy border the shell cannot draw', () => {
+    const bordered = { ...hub.button, border: { width: 2, colour: '#000000', style: 'dashed' } };
+    expect(buttonSettings(button({ chrome: bordered }), {}, { type: 'url', value: '' }, false).fidelity).toContainEqual({ property: 'button.border', legacy: '2px dashed #000000', v3: 'none', hubWide: true });
   });
 
   it('a left icon, full width, and colours that differ from the hub primary', () => {
@@ -77,7 +82,25 @@ describe('buttonSettings', () => {
     expect(out.fidelity).toContainEqual({ property: 'button.colours', legacy: '#000000 on #ffffff', v3: 'hub primary' });
   });
 
-  it('a pill at the base chrome still differs from lg and says so', () => {
-    expect(buttonSettings(button({ chrome: DEFAULT_HUB_PROFILE.button }), {}, { type: 'url', value: '' }, false).fidelity[0]?.legacy).toBe('40px radius, 13px 30px, no shadow, weight 700');
+  it('describes a pill at the base chrome', () => {
+    expect(describeButtonChrome(DEFAULT_HUB_PROFILE.button)).toBe('40px radius, 13px 30px, no shadow, weight 700');
+  });
+});
+
+describe('buttonShell', () => {
+  const hub = hubStyleProfile({ appearance: { buttons: { cornerRadius: { show: true, topLeft: 0, topRight: 0, bottomRight: 0, bottomLeft: 0 }, dropShadow: { show: true, size: 'large' } } } });
+  const button = (over: Partial<ButtonProfile>): ButtonProfile => ({ ...base, kind: 'button', chrome: hub.button, fullWidth: false, colours: null, ...over });
+
+  it('the ManTalks button: a square shell in the fill colour, padded to 50 x (w+32), clipped, large shadow', () => {
+    expect(buttonShell(button({}), '#5770D1')).toEqual({
+      width: 'fit', gap: 0,
+      surface: { background: { type: 'custom-color', value: '#5770D1' }, borderRadius: '0', padding: '2px 16px', clip: true, shadow: 'lg' },
+    });
+  });
+
+  it('the base pill: 40px corners, no shadow; the large preset pads to 66 x (w+98); full width fills the column', () => {
+    expect(buttonShell(button({ chrome: DEFAULT_HUB_PROFILE.button }), '#F7B01E').surface).toEqual({ background: { type: 'custom-color', value: '#F7B01E' }, borderRadius: '40px', padding: '2px 16px', clip: true });
+    expect(buttonShell(button({ chrome: { ...hub.button, paddingY: 21, paddingX: 63 } }), '#5770D1').surface).toMatchObject({ padding: '10px 49px' });
+    expect(buttonShell(button({ fullWidth: true }), '#5770D1').width).toBe('full');
   });
 });

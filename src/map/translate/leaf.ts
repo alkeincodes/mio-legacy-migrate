@@ -1,6 +1,7 @@
 import type { ButtonChrome, ButtonProfile, Corners, HeadlineProfile, ImageProfile, TextProfile } from '../profile/types.js';
 import { BUTTON_ICONS } from '../style.js';
 import { FIDELITY_THRESHOLD_PX, type FidelityEntry } from './fidelity.js';
+import { cornersShorthand, paddingShorthand } from './surface.js';
 
 type Obj = Record<string, unknown>;
 interface Translated { settings: Obj; fidelity: FidelityEntry[] }
@@ -76,8 +77,8 @@ export const V3_LG_BUTTON = 'size lg: 14.4px radius, 14px x 46px, no shadow, wei
 
 /**
  * button.tsx has variant, size, icons, fullWidthMobile, newTab and action, nothing
- * else. Every chrome difference is one hub-wide entry per distinct chrome; the
- * caller collapses duplicates.
+ * else. The chrome (radius, padding, shadow) comes from the shell below; what
+ * the shell cannot give is the weight and a border, reported hub-wide.
  */
 export function buttonSettings(p: ButtonProfile, legacySettings: Obj, action: { type: string; value: string }, newTab: boolean): Translated {
   const settings: Obj = { action, variant: 'primary', size: 'lg', newTab };
@@ -87,7 +88,38 @@ export function buttonSettings(p: ButtonProfile, legacySettings: Obj, action: { 
     settings[icon['alignment'] === 'left' ? 'icon' : 'iconRight'] = BUTTON_ICONS[glyph];
   }
   if (p.fullWidth) settings['fullWidthMobile'] = true;
-  const fidelity: FidelityEntry[] = [{ property: 'button.chrome', legacy: describeButtonChrome(p.chrome), v3: V3_LG_BUTTON, hubWide: true }];
+  const fidelity: FidelityEntry[] = [{ property: 'button.weight', legacy: `${p.chrome.fontWeight}`, v3: '400', hubWide: true }];
+  if (p.chrome.border) {
+    const b = p.chrome.border;
+    fidelity.push({ property: 'button.border', legacy: `${b.width}px ${b.style} ${b.colour}`, v3: 'none', hubWide: true });
+  }
   if (p.colours) fidelity.push({ property: 'button.colours', legacy: `${p.colours.background} on ${p.colours.text}`, v3: 'hub primary' });
   return { settings, fidelity };
+}
+
+/** ui/button.tsx lg: 46px tall, 14px sides; legacy .btn line-height is 16px × 1.5. */
+const V3_LG_HEIGHT = 46;
+const V3_LG_PADDING_X = 14;
+const LEGACY_BTN_LINE = 24;
+const SHADOW: Record<string, string> = { small: 'sm', medium: 'md', large: 'lg' };
+
+/**
+ * The legacy button chrome as a shrink-wrapped stack around the V3 button: a
+ * box of the button's fill colour with the legacy corners, padded out to the
+ * legacy size, clipping the fill's hover growth, carrying the legacy shadow.
+ * The V3 button's own rounded fill sits inside it in the same colour, so the
+ * visible shape is legacy's. `fillHex` must be what the V3 primary fill renders.
+ */
+export function buttonShell(p: ButtonProfile, fillHex: string): Obj {
+  const c = p.chrome;
+  const dy = Math.max(0, Math.round((c.paddingY * 2 + LEGACY_BTN_LINE - V3_LG_HEIGHT) / 2));
+  const dx = Math.max(0, c.paddingX - V3_LG_PADDING_X);
+  const surface: Obj = {
+    background: { type: 'custom-color', value: fillHex },
+    borderRadius: cornersShorthand(c.radius),
+    padding: paddingShorthand({ top: dy, right: dx, bottom: dy, left: dx }),
+    clip: true,
+  };
+  if (c.shadow) surface['shadow'] = SHADOW[c.shadow];
+  return { width: p.fullWidth ? 'full' : 'fit', gap: 0, surface };
 }
