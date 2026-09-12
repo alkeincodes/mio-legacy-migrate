@@ -199,7 +199,7 @@ describe('page and url cards with real legacy shapes', () => {
     const fixture = loadFixture('grid-page');
     const card = { ...fixture.children[0]!, model_type: 'App\\Page', model_id: 284465, settings: JSON.stringify({ link: { label: 'Start' } }) };
     const node = mapSection(fixture.section, 0, { ...contextFor({ ...fixture, children: [card] }, []), pageSlugById: (id) => (id === 284465 ? 'start-here' : null) });
-    const button = cardsOf(node)?.[0]?.children?.find((c) => c.kind === 'button');
+    const button = cardsOf(node)?.[0]?.children?.find((c) => c.kind === 'stack')?.children?.[0];
     expect(button?.value).toBe('Start');
     expect(button?.settings?.['action']).toEqual({ type: 'page', value: '/start-here' });
   });
@@ -208,7 +208,7 @@ describe('page and url cards with real legacy shapes', () => {
     const fixture = loadFixture('grid-url');
     const doc = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'https://x.example.com/a' }] }] });
     const card = { ...fixture.children[0]!, settings: JSON.stringify({ link: { url: doc, label: 'Go', newTab: true } }) };
-    const button = cardsOf(mapSection(fixture.section, 0, contextFor({ ...fixture, children: [card] }, [])))?.[0]?.children?.find((c) => c.kind === 'button');
+    const button = cardsOf(mapSection(fixture.section, 0, contextFor({ ...fixture, children: [card] }, [])))?.[0]?.children?.find((c) => c.kind === 'stack')?.children?.[0];
     expect(button?.settings?.['action']).toEqual({ type: 'url', value: 'https://x.example.com/a' });
     expect(button?.settings?.['newTab']).toBe(true);
   });
@@ -234,7 +234,7 @@ describe('a legacy scroll of tiles (ManTalks Begin Training)', () => {
   it('is the catalog Scroll section: title and a horizontal strip of six cards in legacy order, playlists bound without repeat', () => {
     const fixture = loadFixture('scroll-tiles');
     const warnings: PlanWarning[] = [];
-    const node = mapSection(fixture.section, 2, { ...contextFor(fixture, warnings), pageSlugById: (id) => (id === 418149 ? 'compass' : null) });
+    const node = mapSection(fixture.section, 2, { ...contextFor(fixture, warnings), pageSlugById: (id) => (id === 418149 ? 'attachment' : null), pageTitleById: (id) => (id === 418149 ? 'Training: Attachment' : null) });
     expect(node.template).toBe('compact');
     const body = node.children?.[0];
     expect(body?.kind).toBe('stack');
@@ -243,18 +243,26 @@ describe('a legacy scroll of tiles (ManTalks Begin Training)', () => {
     expect(strip?.kind).toBe('horizontal-scroll');
     expect(strip?.settings).toEqual({ itemWidth: 'card' });
     const cards = strip?.children ?? [];
-    expect(cards.map((c) => c.dataSource?.type ?? c.children?.find((k) => k.kind === 'button')?.settings?.['action'])).toEqual([
+    expect(cards.map((c) => c.dataSource?.type ?? c.children?.map((k) => k.kind))).toEqual([
       'playlist', 'playlist', 'playlist',
-      { type: 'page', value: '/compass' },
-      { type: 'url', value: 'https://example.com/book' },
-      { type: 'url', value: 'https://example.com/shop' },
+      ['image', 'stack'],
+      ['image'],
+      ['image', 'stack'],
     ]);
     for (const card of cards.slice(0, 3)) {
       expect(card.repeat).toBeUndefined();
       expect(card.children?.map((k) => k.kind)).toEqual(['media-slot', 'stack']);
     }
     expect(cards[0]?.dataSource).toEqual({ type: 'playlist', id: playlistRef(323878) });
+    // The page tile goes to a page: a compact secondary link named after that page, shrink-wrapped.
+    const pageLink = cards[3]?.children?.[1];
+    expect(pageLink?.settings).toEqual({ align: 'start', gap: 0 });
+    expect(pageLink?.children?.[0]).toMatchObject({ kind: 'button', value: 'Training: Attachment', settings: { action: { type: 'page', value: '/attachment' }, variant: 'secondary', size: 'md', newTab: false } });
+    // A `#` tile goes nowhere on legacy either: picture only, no button, no title (showTitle false).
+    expect(cards[4]?.children?.map((k) => k.kind)).toEqual(['image']);
+    expect(cards[5]?.children?.[1]?.children?.[0]).toMatchObject({ kind: 'button', value: 'Shop', settings: { action: { type: 'url', value: 'https://example.com/shop' } } });
     expect(warnings.filter((w) => w.type !== 'fidelity')).toEqual([]);
+    expect(warnings.filter((w) => w.property === 'tile.link').map((w) => w.legacySectionId)).toEqual([4289652, 4289651]);
   });
 });
 

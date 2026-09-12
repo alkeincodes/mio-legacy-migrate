@@ -122,12 +122,14 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
     );
 
     // Page decoration (a section's image, a page's featured image) is Spatie
-    // media owned by the section or page, not by a File.
+    // media owned by the section or page, not by a File. A playlist's own
+    // thumbnail is its `featured-images` media (ThumbnailService::COLLECTION).
     const media = await fetchMedia(session, [
       { modelType: MORPH_HUB, modelId: hub.id },
       ...files.map((f) => ({ modelType: MORPH_FILE, modelId: f.id })),
       ...sections.map((s) => ({ modelType: MORPH_SECTION, modelId: s.id })),
       ...pages.map((p) => ({ modelType: MORPH_PAGE, modelId: p.id })),
+      ...playlists.map((p) => ({ modelType: MORPH_PLAYLIST, modelId: p.id })),
     ]);
 
     const discussionCategories = await fetchDiscussionCategories(session, hub.id);

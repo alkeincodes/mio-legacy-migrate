@@ -36,6 +36,8 @@ export interface MapContext {
   resolvePageSlug?(legacySlug: string): string;
   /** The V3 slug of a legacy page by id, for cards whose target is a page row. */
   pageSlugById?(legacyPageId: number): string | null;
+  /** The legacy title of a page by id, the label a tile's link button falls back to. */
+  pageTitleById?(legacyPageId: number): string | null;
   /** The legacy media id behind a section that links a File. */
   mediaIdForSection?(section: LegacySection): number | null;
   /** The manifest entry behind a legacy CDN URL, for card and section images. */
@@ -85,19 +87,32 @@ function bindPlaylist(node: CatalogNode, ref: string): CatalogNode {
   return node;
 }
 
-function cardLink(block: LegacySection, settings: Record<string, unknown>, ctx: MapContext): { label: string; action: { type: string; value: string } } {
+interface CardLink { label: string; action: { type: string; value: string }; hasTarget: boolean }
+
+/**
+ * Where a legacy tile goes and what to call the link. CustomGridBlock.vue makes
+ * the whole tile the anchor; the label is only needed because V3 has to draw a
+ * button for it: the legacy link label, else the tile title, else the target
+ * page's title or the url host. A `#` or empty url is a tile that goes nowhere.
+ */
+function cardLink(block: LegacySection, settings: Record<string, unknown>, ctx: MapContext): CardLink {
   const link = settings['link'] as Record<string, unknown> | undefined;
   const urlDoc = parseDoc(link?.['url']);
-  const href = urlDoc ? docToText(urlDoc) : typeof link?.['url'] === 'string' ? link['url'].trim() : '';
-  const label = typeof link?.['label'] === 'string' && link['label'].trim() ? link['label'].trim() : block.title ?? 'Open';
+  const href = urlDoc ? docToText(urlDoc).trim() : typeof link?.['url'] === 'string' ? link['url'].trim() : '';
+  const ownLabel = typeof link?.['label'] === 'string' && link['label'].trim() ? link['label'].trim() : block.title?.trim() || null;
   if (block.type.endsWith('-page')) {
     const byId = block.model_id === null ? null : (ctx.pageSlugById?.(block.model_id) ?? null);
     const bySlug = typeof settings['slug'] === 'string' && settings['slug'] ? (ctx.resolvePageSlug ?? ((x: string) => x))(settings['slug']) : '';
     const slug = byId ?? bySlug;
+    const pageTitle = block.model_id === null ? null : (ctx.pageTitleById?.(block.model_id) ?? null);
+    const label = ownLabel ?? pageTitle ?? 'Open';
     if (!slug) ctx.warn({ pageSlug: ctx.pageSlug, legacySectionId: block.id, type: 'approximated', reason: `page card "${label}" has no resolvable page target` });
-    return { label, action: { type: 'page', value: slug ? `/${pageRef(slug)}` : '' } };
+    return { label, action: { type: 'page', value: slug ? `/${pageRef(slug)}` : '' }, hasTarget: slug !== '' };
   }
-  return { label, action: { type: 'url', value: href } };
+  const hasTarget = href !== '' && href !== '#';
+  let host: string | null = null;
+  try { host = hasTarget ? new URL(href.startsWith('http') ? href : `https://${href}`).hostname : null; } catch { host = null; }
+  return { label: ownLabel ?? host ?? 'Open', action: { type: 'url', value: href }, hasTarget };
 }
 
 /** The picture a legacy card shows: its own thumbnail, else its background image. */
@@ -182,27 +197,31 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext, sibli
   }
 
   if (block.type.endsWith('-page') || block.type.endsWith('-url') || block.type === 'carousel-cta') {
-    // A legacy card is a picture with a link over it; the title is usually hidden.
-    const { label, action } = cardLink(block, settings, ctx);
+    // A legacy tile (CustomGridBlock.vue) is a picture that is itself the link,
+    // with an optional title over it. V3 has no clickable image tile, so a tile
+    // that goes somewhere gets a compact link button under the picture and a
+    // fidelity entry; a tile that goes nowhere (`#`) is just the picture.
+    const { label, action, hasTarget } = cardLink(block, settings, ctx);
     const image = cardImage(settings, ctx);
     const link = settings['link'] as Record<string, unknown> | undefined;
+    const mintCard = (n: number): string => nodeId(ctx.legacyHubId, ctx.legacyPageId, block.id, ordinal + EXTRA_ORDINAL_BASE + n);
     const children: CatalogNode[] = [];
     if (image) {
-      children.push({
-        id: nodeId(ctx.legacyHubId, ctx.legacyPageId, block.id, ordinal + EXTRA_ORDINAL_BASE),
-        kind: 'image',
-        value: image,
-        settings: { alt: label, aspectRatio: '16:9', objectFit: 'cover', radius: 'm' },
-      });
+      children.push({ id: mintCard(0), kind: 'image', value: image, settings: { alt: label, aspectRatio: '16:9', objectFit: 'cover', radius: 'm' } });
     }
-    // Card buttons are catalog chrome, not legacy buttons; their chrome entry would double-count, so it is not reported.
-    const cardButton = buttonSettings(hubButtonProfile(ctx.hubProfile ?? DEFAULT_HUB_PROFILE), settings, action, link?.['newTab'] === true);
-    children.push({
-      id: nodeId(ctx.legacyHubId, ctx.legacyPageId, block.id, ordinal + EXTRA_ORDINAL_BASE + 1),
-      kind: 'button',
-      value: label,
-      settings: cardButton.settings,
-    });
+    const title = block.title?.trim() ?? '';
+    if (settings['showTitle'] !== false && title) {
+      children.push({ id: mintCard(2), kind: 'text', value: title, settings: { align: 'left', marginBottom: 0, weight: 700 } });
+    }
+    if (hasTarget) {
+      children.push({
+        id: mintCard(3),
+        kind: 'stack',
+        settings: { align: 'start', gap: 0 },
+        children: [{ id: mintCard(1), kind: 'button', value: label, settings: { action, variant: 'secondary', size: 'md', newTab: link?.['newTab'] === true } }],
+      });
+      ctx.warn(fidelityWarning({ property: 'tile.link', legacy: 'the whole image tile is the link', v3: `button "${label}" under the image` }, ctx.pageSlug, block.id));
+    }
     return { id, kind: 'content-card', template: 'content-card', settings: { surface: { borderRadius: 'md' } }, children };
   }
 

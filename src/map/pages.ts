@@ -169,6 +169,8 @@ export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
   // By id: the built-in route for a page V3 replaces (discussions, login, register), else the migrated slug.
   const legacySlugByPage = new Map<number, string>();
   for (const [legacySlug, slug] of slugByLegacySlug) { const page = ordered.find((pg) => slugByPage.get(pg.id) === slug); if (page) legacySlugByPage.set(page.id, legacySlug); }
+  const titleById = new Map(bundle.pages.map((pg) => [pg.id, pg.title]));
+  const pageTitleById = (legacyPageId: number): string | null => titleById.get(legacyPageId)?.trim() || null;
   const routeSlugById = (legacyPageId: number): string | null => {
     const route = excludedRouteById.get(legacyPageId);
     if (route) return route;
@@ -189,6 +191,7 @@ export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
       warn: (w) => warnings.push(w),
       resolvePageSlug,
       pageSlugById: routeSlugById,
+      pageTitleById,
       mediaIdForSection: (s) => (s.model_type === MORPH_FILE && s.model_id !== null ? mediaByFileId.get(s.model_id) ?? null : null),
       assetForUrl: (url) => assetByUrl.get(url) ?? null,
       themeColours,
