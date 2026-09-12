@@ -402,3 +402,15 @@ nothing under an <img>, and V3 has the setting for that: `backdrop: false`
 for every legacy image. Plan hub-38827-b764036a1e45 applied 16:00Z, 10 pages
 rewritten; the wrapper is `bg-transparent` on the live hub.
 
+## 2026-09-13: legacy-gap project skill
+
+Captured the loop used for every gap today as a project skill,
+`.claude/skills/legacy-gap/` (SKILL.md, references/renderer-map.md with the
+file:line facts for both renderers, references/apply-runbook.md with the one
+resume command and its traps), plus a checked-in probe,
+`scripts/probe/hub-probe.mjs measure|shot|images`. Written test-first: a
+fresh agent without the skill planned a plain `apply` with no `--resume`
+(which would create a second hub) and would have re-investigated the
+recorded ink limitation; with the skill it quoted the resume command, checked
+the radar first and named the right files.
+
