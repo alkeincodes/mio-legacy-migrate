@@ -264,5 +264,16 @@ describe('a legacy scroll of tiles (ManTalks Begin Training)', () => {
     expect(warnings.filter((w) => w.type !== 'fidelity')).toEqual([]);
     expect(warnings.filter((w) => w.property === 'tile.link').map((w) => w.legacySectionId)).toEqual([4289652, 4289651]);
   });
+
+  it('reads a TipTap tile title for the link label and the shown title', () => {
+    const fixture = loadFixture('scroll-tiles');
+    const doc = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Book a call' }] }] });
+    const tile = { ...fixture.children[5]!, title: doc, settings: JSON.stringify({ link: { url: 'https://example.com/book' }, showTitle: true, background: { type: 'image', image: { url: 'https://cdn.example.com/x.png' } } }) };
+    const node = mapSection(fixture.section, 2, contextFor({ ...fixture, children: [tile] }, []));
+    const card = node.children?.[0]?.children?.[1]?.children?.[0];
+    expect(card?.children?.map((k) => k.kind)).toEqual(['image', 'text', 'stack']);
+    expect(card?.children?.[1]).toMatchObject({ kind: 'text', value: 'Book a call' });
+    expect(card?.children?.[2]?.children?.[0]).toMatchObject({ kind: 'button', value: 'Book a call' });
+  });
 });
 

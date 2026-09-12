@@ -89,6 +89,12 @@ function bindPlaylist(node: CatalogNode, ref: string): CatalogNode {
 
 interface CardLink { label: string; action: { type: string; value: string }; hasTarget: boolean }
 
+/** A tile's title is a TipTap document on the real hub, a plain string in old rows. */
+function tileTitle(block: LegacySection): string {
+  const doc = parseDoc(block.title);
+  return (doc ? docToText(doc) : block.title ?? '').trim();
+}
+
 /**
  * Where a legacy tile goes and what to call the link. CustomGridBlock.vue makes
  * the whole tile the anchor; the label is only needed because V3 has to draw a
@@ -99,7 +105,7 @@ function cardLink(block: LegacySection, settings: Record<string, unknown>, ctx: 
   const link = settings['link'] as Record<string, unknown> | undefined;
   const urlDoc = parseDoc(link?.['url']);
   const href = urlDoc ? docToText(urlDoc).trim() : typeof link?.['url'] === 'string' ? link['url'].trim() : '';
-  const ownLabel = typeof link?.['label'] === 'string' && link['label'].trim() ? link['label'].trim() : block.title?.trim() || null;
+  const ownLabel = typeof link?.['label'] === 'string' && link['label'].trim() ? link['label'].trim() : tileTitle(block) || null;
   if (block.type.endsWith('-page')) {
     const byId = block.model_id === null ? null : (ctx.pageSlugById?.(block.model_id) ?? null);
     const bySlug = typeof settings['slug'] === 'string' && settings['slug'] ? (ctx.resolvePageSlug ?? ((x: string) => x))(settings['slug']) : '';
@@ -209,7 +215,7 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext, sibli
     if (image) {
       children.push({ id: mintCard(0), kind: 'image', value: image, settings: { alt: label, aspectRatio: '16:9', objectFit: 'cover', radius: 'm' } });
     }
-    const title = block.title?.trim() ?? '';
+    const title = tileTitle(block);
     if (settings['showTitle'] !== false && title) {
       children.push({ id: mintCard(2), kind: 'text', value: title, settings: { align: 'left', marginBottom: 0, weight: 700 } });
     }
