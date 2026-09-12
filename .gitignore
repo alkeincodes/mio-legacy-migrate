@@ -1,7 +1,7 @@
 node_modules/
 dist/
 bundles/
-plans/
+/plans/
 runs/
 state/
 .playwright/
