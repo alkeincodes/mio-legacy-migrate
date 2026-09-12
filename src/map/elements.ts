@@ -9,12 +9,7 @@ import { elementProfile } from './profile/element.js';
 import { DEFAULT_HUB_PROFILE } from './profile/hub.js';
 import type { HubStyleProfile } from './profile/types.js';
 import { fidelityWarning, type FidelityEntry } from './translate/fidelity.js';
-import { buttonSettings, buttonShell, headlineSettings, imageSettings, textSettings } from './translate/leaf.js';
-
-/** Ordinals above this mint the button shell ids; recipe ids start at 5000 and run wrappers at 1000. */
-const SHELL_ORDINAL_BASE = 2000;
-/** V3's default primary, what the button fill renders when the hub sets nothing. */
-const V3_DEFAULT_PRIMARY = '#F7B01E';
+import { buttonSettings, headlineSettings, imageSettings, textSettings } from './translate/leaf.js';
 
 export interface ElementContext {
   legacyHubId: number;
@@ -37,8 +32,6 @@ export interface ElementContext {
   columnContentWidth?: number | null;
   /** The button background the hub primary was set to, so majority buttons raise no colour entry. */
   dominantButtonBackground?: string | null;
-  /** The hex the V3 primary button fill renders, for the chrome shell around each button. */
-  buttonFillHex?: string;
 }
 
 function parseSettings(raw: unknown): Record<string, unknown> {
@@ -207,12 +200,7 @@ export function mapElement(
       if (profile.kind !== 'button') return null;
       const button = buttonSettings(profile, settings, action, link?.['newTab'] === true);
       report(button.fidelity);
-      return {
-        id: nodeId(ctx.legacyHubId, ctx.legacyPageId, section.id, SHELL_ORDINAL_BASE + ordinal),
-        kind: 'stack',
-        settings: buttonShell(profile, ctx.buttonFillHex ?? V3_DEFAULT_PRIMARY),
-        children: [{ id, kind: 'button', value: label, settings: button.settings }],
-      };
+      return { id, kind: 'button', value: label, settings: button.settings };
     }
 
     case 'line-break':

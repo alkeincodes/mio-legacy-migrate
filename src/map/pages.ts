@@ -118,10 +118,6 @@ export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
   const themeColours = (themeSettings['colors'] ?? {}) as { primary?: string; secondary?: string };
   const hubProfile = hubStyleProfile(themeSettings);
   const dominantButtonBackground = dominantButtonColour(bundle.sections)?.background ?? null;
-  // What the V3 primary fill renders after branding: the dominant legacy button
-  // colour, else the legacy theme primary when it is a valid hex, else V3's default.
-  const legacyPrimary = themeColours.primary;
-  const buttonFillHex = dominantButtonBackground ?? (legacyPrimary && /^#[0-9a-fA-F]{6}$/.test(legacyPrimary) ? legacyPrimary : '#F7B01E');
   const assetByUrl = new Map(bundle.assets.map((a) => [a.cdnUrl, { legacyMediaId: a.legacyMediaId, variant: a.variant }]));
 
   const sectionsByParent = new Map<number, LegacySection[]>();
@@ -198,12 +194,10 @@ export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
       themeColours,
       hubProfile,
       dominantButtonBackground,
-      buttonFillHex,
       mapElement: (section, ordinal, extra) =>
         mapElement(section, ordinal, {
           hubProfile,
           dominantButtonBackground,
-          buttonFillHex,
           columnContentWidth: extra?.columnContentWidth ?? null,
           legacyHubId: bundle.header.legacyHubId,
           legacyPageId: page.id,

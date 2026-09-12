@@ -22,14 +22,6 @@ function ctx(warnings: PlanWarning[] = []): ElementContext {
   };
 }
 
-/** A legacy button maps to a chrome shell stack around the V3 button; tests read the button through it. */
-function mapButton(section: LegacySection, ordinal: number, context: ElementContext): ReturnType<typeof mapElement> {
-  const shell = mapElement(section, ordinal, context);
-  expect(shell?.kind).toBe('stack');
-  expect(shell?.settings?.['width']).toBe('fit');
-  return shell?.children?.[0] ?? null;
-}
-
 describe('mapElement', () => {
   it('headline: emits a headline with the content in the top-level value', () => {
     const node = mapElement(fixture('headline'), 0, ctx());
@@ -75,7 +67,7 @@ describe('mapElement', () => {
   });
 
   it('button: builds a url action object, not the deprecated href string', () => {
-    const node = mapButton(fixture('button'), 6, ctx());
+    const node = mapElement(fixture('button'), 6, ctx());
     expect(node?.kind).toBe('button');
     expect(node?.value).toBe('Join now');
     expect(node?.settings?.['action']).toEqual({
@@ -88,7 +80,7 @@ describe('mapElement', () => {
   it('button: rewrites a link to another page on this hub as a page action', () => {
     const section = fixture('button');
     section.settings = JSON.stringify({ link: { url: 'https://alliance.mantalks.com/courses' } });
-    const node = mapButton(section, 6, { ...ctx(), pageSlug: 'home' });
+    const node = mapElement(section, 6, { ...ctx(), pageSlug: 'home' });
     expect(node?.settings?.['action']).toEqual({ type: 'page', value: '/courses' });
   });
 
@@ -130,7 +122,7 @@ describe('mapElement', () => {
   });
 
   it('never emits a node kind outside the catalog vocabulary', () => {
-    const allowed = new Set(['headline', 'text', 'image', 'video', 'icon', 'button', 'divider', 'stack']);
+    const allowed = new Set(['headline', 'text', 'image', 'video', 'icon', 'button', 'divider']);
     for (const name of ['headline', 'subheadline', 'text', 'image', 'video', 'icon', 'button', 'line-break', 'input', 'embed-code']) {
       const node = mapElement(fixture(name), 0, ctx());
       if (node) expect(allowed.has(node.kind)).toBe(true);
@@ -162,7 +154,7 @@ describe('links to renamed pages', () => {
   it('rewrites a same-origin link to a reserved slug onto the renamed slug', () => {
     const section = fixture('button');
     section.settings = JSON.stringify({ link: { url: 'https://alliance.mantalks.com/onboarding' } });
-    const node = mapButton(section, 6, { ...ctx(), resolvePageSlug: (s) => (s === 'onboarding' ? 'onboarding-page' : s) });
+    const node = mapElement(section, 6, { ...ctx(), resolvePageSlug: (s) => (s === 'onboarding' ? 'onboarding-page' : s) });
     expect(node?.settings?.['action']).toEqual({ type: 'page', value: '/onboarding-page' });
   });
 });
@@ -187,19 +179,19 @@ describe('real legacy content shapes', () => {
 
   it('button: label from settings.link.label and a page target from the row model_id', () => {
     const section = { ...fixture('button'), label: 'Button', model_type: 'App\\Page', model_id: 284465, settings: JSON.stringify({ type: 'page', link: { label: 'View Here' } }) };
-    const node = mapButton(section, 6, { ...ctx(), pageSlugById: (id) => (id === 284465 ? 'training' : null) });
+    const node = mapElement(section, 6, { ...ctx(), pageSlugById: (id) => (id === 284465 ? 'training' : null) });
     expect(node?.value).toBe('View Here');
     expect(node?.settings?.['action']).toEqual({ type: 'page', value: '/training' });
   });
 
   it('button: a playlist target becomes a resolvable playlist reference', () => {
     const section = { ...fixture('button'), model_type: 'App\\Playlist', model_id: 42, settings: JSON.stringify({ type: 'playlist', link: { label: 'Watch' } }) };
-    expect(mapButton(section, 6, ctx())?.settings?.['action']).toEqual({ type: 'page', value: 'ledger://playlist/42' });
+    expect(mapElement(section, 6, ctx())?.settings?.['action']).toEqual({ type: 'page', value: 'ledger://playlist/42' });
   });
 
   it('button: a custom link keeps the URL out of the TipTap document', () => {
     const section = { ...fixture('button'), model_type: null, model_id: null, settings: JSON.stringify({ type: 'custom', link: { label: 'Download', url: doc('https://cdn.example.com/w.pdf'), newTab: true } }) };
-    const node = mapButton(section, 6, ctx());
+    const node = mapElement(section, 6, ctx());
     expect(node?.settings?.['action']).toEqual({ type: 'url', value: 'https://cdn.example.com/w.pdf' });
     expect(node?.settings?.['newTab']).toBe(true);
   });
