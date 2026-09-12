@@ -204,9 +204,9 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext, sibli
 
   if (block.type.endsWith('-page') || block.type.endsWith('-url') || block.type === 'carousel-cta') {
     // A legacy tile (CustomGridBlock.vue) is a picture that is itself the link,
-    // with an optional title over it. V3 has no clickable image tile, so a tile
-    // that goes somewhere gets a compact link button under the picture and a
-    // fidelity entry; a tile that goes nowhere (`#`) is just the picture.
+    // with an optional title over it and no button. V3 has no clickable image
+    // tile, so the picture and title are carried and the link is recorded as
+    // lost; only a cta card, which has a button in legacy too, keeps one.
     const { label, action, hasTarget } = cardLink(block, settings, ctx);
     const image = cardImage(settings, ctx);
     const link = settings['link'] as Record<string, unknown> | undefined;
@@ -219,14 +219,11 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext, sibli
     if (settings['showTitle'] !== false && title) {
       children.push({ id: mintCard(2), kind: 'text', value: title, settings: { align: 'left', marginBottom: 0, weight: 700 } });
     }
-    if (hasTarget) {
-      children.push({
-        id: mintCard(3),
-        kind: 'stack',
-        settings: { align: 'start', gap: 0 },
-        children: [{ id: mintCard(1), kind: 'button', value: label, settings: { action, variant: 'secondary', size: 'md', newTab: link?.['newTab'] === true } }],
-      });
-      ctx.warn(fidelityWarning({ property: 'tile.link', legacy: 'the whole image tile is the link', v3: `button "${label}" under the image` }, ctx.pageSlug, block.id));
+    if (block.type === 'carousel-cta') {
+      const cta = buttonSettings(hubButtonProfile(ctx.hubProfile ?? DEFAULT_HUB_PROFILE), settings, action, link?.['newTab'] === true);
+      children.push({ id: mintCard(1), kind: 'button', value: label, settings: cta.settings });
+    } else if (hasTarget) {
+      ctx.warn(fidelityWarning({ property: 'tile.link', legacy: `the image tile links to ${action.value}`, v3: 'picture only; V3 has no clickable image tile' }, ctx.pageSlug, block.id));
     }
     return { id, kind: 'content-card', template: 'content-card', settings: { surface: { borderRadius: 'md' } }, children };
   }

@@ -198,19 +198,22 @@ describe('page and url cards with real legacy shapes', () => {
   it('resolves a page card by the row model_id and takes its label from settings.link.label', () => {
     const fixture = loadFixture('grid-page');
     const card = { ...fixture.children[0]!, model_type: 'App\\Page', model_id: 284465, settings: JSON.stringify({ link: { label: 'Start' } }) };
-    const node = mapSection(fixture.section, 0, { ...contextFor({ ...fixture, children: [card] }, []), pageSlugById: (id) => (id === 284465 ? 'start-here' : null) });
-    const button = cardsOf(node)?.[0]?.children?.find((c) => c.kind === 'stack')?.children?.[0];
-    expect(button?.value).toBe('Start');
-    expect(button?.settings?.['action']).toEqual({ type: 'page', value: '/start-here' });
+    const warnings: PlanWarning[] = [];
+    const node = mapSection(fixture.section, 0, { ...contextFor({ ...fixture, children: [card] }, warnings), pageSlugById: (id) => (id === 284465 ? 'start-here' : null) });
+    // Legacy tiles have no button; the lost link is recorded with its target.
+    expect(cardsOf(node)?.[0]?.children?.some((c) => c.kind === 'button')).toBe(false);
+    const lost = warnings.find((w) => w.property === 'tile.link');
+    expect(lost?.legacy).toBe('the image tile links to /start-here');
   });
 
   it('reads a url card link out of its TipTap document', () => {
     const fixture = loadFixture('grid-url');
     const doc = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'https://x.example.com/a' }] }] });
     const card = { ...fixture.children[0]!, settings: JSON.stringify({ link: { url: doc, label: 'Go', newTab: true } }) };
-    const button = cardsOf(mapSection(fixture.section, 0, contextFor({ ...fixture, children: [card] }, [])))?.[0]?.children?.find((c) => c.kind === 'stack')?.children?.[0];
-    expect(button?.settings?.['action']).toEqual({ type: 'url', value: 'https://x.example.com/a' });
-    expect(button?.settings?.['newTab']).toBe(true);
+    const warnings: PlanWarning[] = [];
+    const cards = cardsOf(mapSection(fixture.section, 0, contextFor({ ...fixture, children: [card] }, warnings)));
+    expect(cards?.[0]?.children?.some((c) => c.kind === 'button')).toBe(false);
+    expect(warnings.find((w) => w.property === 'tile.link')?.legacy).toBe('the image tile links to https://x.example.com/a');
   });
 });
 
@@ -245,35 +248,32 @@ describe('a legacy scroll of tiles (ManTalks Begin Training)', () => {
     const cards = strip?.children ?? [];
     expect(cards.map((c) => c.dataSource?.type ?? c.children?.map((k) => k.kind))).toEqual([
       'playlist', 'playlist', 'playlist',
-      ['image', 'stack'],
       ['image'],
-      ['image', 'stack'],
+      ['image'],
+      ['image'],
     ]);
     for (const card of cards.slice(0, 3)) {
       expect(card.repeat).toBeUndefined();
       expect(card.children?.map((k) => k.kind)).toEqual(['media-slot', 'stack']);
     }
     expect(cards[0]?.dataSource).toEqual({ type: 'playlist', id: playlistRef(323878) });
-    // The page tile goes to a page: a compact secondary link named after that page, shrink-wrapped.
-    const pageLink = cards[3]?.children?.[1];
-    expect(pageLink?.settings).toEqual({ align: 'start', gap: 0 });
-    expect(pageLink?.children?.[0]).toMatchObject({ kind: 'button', value: 'Training: Attachment', settings: { action: { type: 'page', value: '/attachment' }, variant: 'secondary', size: 'md', newTab: false } });
-    // A `#` tile goes nowhere on legacy either: picture only, no button, no title (showTitle false).
-    expect(cards[4]?.children?.map((k) => k.kind)).toEqual(['image']);
-    expect(cards[5]?.children?.[1]?.children?.[0]).toMatchObject({ kind: 'button', value: 'Shop', settings: { action: { type: 'url', value: 'https://example.com/shop' } } });
+    // Legacy tiles are pictures that link; V3 has no clickable picture, so the
+    // link is recorded as lost for the tiles that had one (`#` tiles had none).
     expect(warnings.filter((w) => w.type !== 'fidelity')).toEqual([]);
-    expect(warnings.filter((w) => w.property === 'tile.link').map((w) => w.legacySectionId)).toEqual([4289652, 4289651]);
+    expect(warnings.filter((w) => w.property === 'tile.link').map((w) => [w.legacySectionId, w.legacy])).toEqual([
+      [4289652, 'the image tile links to /attachment'],
+      [4289651, 'the image tile links to https://example.com/shop'],
+    ]);
   });
 
-  it('reads a TipTap tile title for the link label and the shown title', () => {
+  it('reads a TipTap tile title for the shown title', () => {
     const fixture = loadFixture('scroll-tiles');
     const doc = JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Book a call' }] }] });
     const tile = { ...fixture.children[5]!, title: doc, settings: JSON.stringify({ link: { url: 'https://example.com/book' }, showTitle: true, background: { type: 'image', image: { url: 'https://cdn.example.com/x.png' } } }) };
     const node = mapSection(fixture.section, 2, contextFor({ ...fixture, children: [tile] }, []));
     const card = node.children?.[0]?.children?.[1]?.children?.[0];
-    expect(card?.children?.map((k) => k.kind)).toEqual(['image', 'text', 'stack']);
+    expect(card?.children?.map((k) => k.kind)).toEqual(['image', 'text']);
     expect(card?.children?.[1]).toMatchObject({ kind: 'text', value: 'Book a call' });
-    expect(card?.children?.[2]?.children?.[0]).toMatchObject({ kind: 'button', value: 'Book a call' });
   });
 });
 
