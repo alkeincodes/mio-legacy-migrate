@@ -6,9 +6,20 @@ import { nodeId } from './nodeId.js';
 import type { PlanWarning } from './plan.js';
 import { lookupMapping } from './sectionTable.js';
 import { docToText, parseDoc } from './tiptap.js';
-import {
-  buttonSettingsFor, columnSurfaceFor, instantiateRecipe, layoutRowSettings, sectionSurfaceFor, stackWidthFor,
-} from './style.js';
+import { instantiateRecipe } from './style.js';
+import { columnProfile, sectionProfile } from './profile/section.js';
+import { elementProfile } from './profile/element.js';
+import { DEFAULT_HUB_PROFILE } from './profile/hub.js';
+import type { ButtonProfile, HubStyleProfile } from './profile/types.js';
+import { fidelityWarning } from './translate/fidelity.js';
+import { buttonSettings } from './translate/leaf.js';
+import { columnStack, type PlacedElement } from './translate/stack.js';
+import { LAYOUT_ROW_SETTINGS, columnSurface, sectionSurface } from './translate/surface.js';
+
+/** A card or featured-band button is catalog chrome; it takes the hub's button profile with no legacy overrides. */
+function hubButtonProfile(hub: HubStyleProfile): ButtonProfile {
+  return { kind: 'button', align: 'left', marginTop: 0, bottomMargin: 0, chrome: hub.button, fullWidth: false, colours: null };
+}
 
 export interface MapContext {
   legacyHubId: number;
@@ -16,7 +27,11 @@ export interface MapContext {
   pageSlug: string;
   childrenOf(sectionId: number): LegacySection[];
   warn(warning: PlanWarning): void;
-  mapElement(section: LegacySection, ordinal: number): CatalogNode | null;
+  mapElement(section: LegacySection, ordinal: number, extra?: { columnContentWidth?: number }): CatalogNode | null;
+  /** The hub theme's style profile; defaults to the SCSS base. */
+  hubProfile?: HubStyleProfile;
+  /** The button background the hub primary was set to. */
+  dominantButtonBackground?: string | null;
   /** The V3 slug for a legacy page slug, when the mapper renamed it. */
   resolvePageSlug?(legacySlug: string): string;
   /** The V3 slug of a legacy page by id, for cards whose target is a page row. */
@@ -97,7 +112,7 @@ function cardImage(settings: Record<string, unknown>, ctx: MapContext): string |
   return asset ? assetRef(asset.legacyMediaId, asset.variant) : url;
 }
 
-function blockNode(block: LegacySection, ordinal: number, ctx: MapContext): CatalogNode {
+function blockNode(block: LegacySection, ordinal: number, ctx: MapContext, siblingCount = 1): CatalogNode {
   const id = nodeId(ctx.legacyHubId, ctx.legacyPageId, block.id, ordinal);
   const settings = parseSettings(block.settings);
   const mapping = lookupMapping(block.type, 'block');
@@ -112,16 +127,22 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext): Cata
   }
 
   if (block.type === 'column') {
-    const children = ctx
-      .childrenOf(block.id)
-      .map((child, i) => ctx.mapElement(child, i))
-      .filter((n): n is CatalogNode => n !== null);
-    const styles = settings['styles'] as Record<string, unknown> | undefined;
-    const nodeSettings: Record<string, unknown> = { gap: 4, width: stackWidthFor(settings['size']) };
-    if (styles?.['align'] === 'center') nodeSettings['align'] = 'center';
-    const surface = columnSurfaceFor(settings, ctx.themeColours ?? {});
-    if (surface) nodeSettings['surface'] = surface;
-    return { id, kind: 'stack', settings: nodeSettings, children };
+    const hub = ctx.hubProfile ?? DEFAULT_HUB_PROFILE;
+    const profile = columnProfile(settings, siblingCount);
+    // Content width of this column at V3's 1240px cap, less the 20px gutter.
+    const columnContentWidth = Math.round((1240 * profile.widthPct) / 100) - 20;
+    const elements: PlacedElement[] = [];
+    ctx.childrenOf(block.id).forEach((child, i) => {
+      const node = ctx.mapElement(child, i, { columnContentWidth });
+      if (node) elements.push({ node, profile: elementProfile(child, hub), legacyId: child.id });
+    });
+    return columnStack({
+      id,
+      profile,
+      elements,
+      surface: columnSurface(profile, settings, ctx.themeColours ?? {}),
+      mintId: (legacyId, n) => nodeId(ctx.legacyHubId, ctx.legacyPageId, legacyId, EXTRA_ORDINAL_BASE + n),
+    });
   }
 
   if (block.type.endsWith('-playlist')) {
@@ -172,11 +193,13 @@ function blockNode(block: LegacySection, ordinal: number, ctx: MapContext): Cata
         settings: { alt: label, aspectRatio: '16:9', objectFit: 'cover', radius: 'm' },
       });
     }
+    // Card buttons are catalog chrome, not legacy buttons; their chrome entry would double-count, so it is not reported.
+    const cardButton = buttonSettings(hubButtonProfile(ctx.hubProfile ?? DEFAULT_HUB_PROFILE), settings, action, link?.['newTab'] === true);
     children.push({
       id: nodeId(ctx.legacyHubId, ctx.legacyPageId, block.id, ordinal + EXTRA_ORDINAL_BASE + 1),
       kind: 'button',
       value: label,
-      settings: buttonSettingsFor(settings, action, link?.['newTab'] === true),
+      settings: cardButton.settings,
     });
     return { id, kind: 'content-card', template: 'content-card', settings: { surface: { borderRadius: 'md' } }, children };
   }
@@ -215,21 +238,24 @@ function featuredSection(section: LegacySection, id: string, settings: Record<st
   const descriptionDoc = parseDoc(settings['description']);
   const buttonLabel = typeof settings['buttonLabel'] === 'string' ? settings['buttonLabel'].trim() : '';
   const stack: CatalogNode[] = [
-    { id: mint(1), kind: 'headline', value: titleDoc ? docToText(titleDoc) : section.title ?? '', settings: { level: 2, weight: 700, size: 'large-title' } },
+    { id: mint(1), kind: 'headline', value: titleDoc ? docToText(titleDoc) : section.title ?? '', settings: { level: 2, weight: 700, align: 'left' } },
   ];
-  if (descriptionDoc) stack.push({ id: mint(2), kind: 'text', value: docToText(descriptionDoc), settings: { marginBottom: 4 } });
+  if (descriptionDoc) stack.push({ id: mint(2), kind: 'text', value: docToText(descriptionDoc), settings: { align: 'left', marginBottom: 0 } });
   if (buttonLabel) {
     const action = section.model_type?.endsWith('Playlist') && section.model_id !== null
       ? { type: 'page', value: playlistRef(section.model_id) }
       : section.model_type?.endsWith('Page') && section.model_id !== null
         ? { type: 'page', value: `/${ctx.pageSlugById?.(section.model_id) ?? ''}` }
         : { type: 'url', value: '' };
-    stack.push({ id: mint(3), kind: 'button', value: buttonLabel, settings: { action, variant: 'primary', size: 'lg' } });
+    const featuredButton = buttonSettings(hubButtonProfile(ctx.hubProfile ?? DEFAULT_HUB_PROFILE), settings, action, false);
+    for (const entry of featuredButton.fidelity) ctx.warn(fidelityWarning(entry, ctx.pageSlug, section.id));
+    stack.push({ id: mint(3), kind: 'button', value: buttonLabel, settings: featuredButton.settings });
   }
   const image = cardImage(settings, ctx);
   const rowChildren: CatalogNode[] = [];
   if (image) rowChildren.push({ id: mint(4), kind: 'image', value: image, settings: { alt: '', aspectRatio: 'auto', objectFit: 'contain', radius: 'm' } });
-  rowChildren.push({ id: mint(5), kind: 'stack', settings: { align: 'start', gap: 2 }, children: stack });
+  // Legacy stacks the featured title, description and button 20px apart; 5 is 20px.
+  rowChildren.push({ id: mint(5), kind: 'stack', settings: { align: 'start', gap: 5 }, children: stack });
   return sectionContainer(id, 'hero', surface, [
     { id: mint(0), kind: 'row', settings: { gap: 'section', responsive: true, split: image !== null }, children: rowChildren },
   ]);
@@ -239,7 +265,8 @@ export function mapSection(section: LegacySection, ordinal: number, ctx: MapCont
   const id = nodeId(ctx.legacyHubId, ctx.legacyPageId, section.id, ordinal);
   const settings = parseSettings(section.settings);
   const mapping = lookupMapping(section.type, 'section');
-  const surface = sectionSurfaceFor(settings, section.hidden === 1, ctx.themeColours ?? {});
+  const { surface, fidelity } = sectionSurface(sectionProfile(settings, ctx.themeColours?.secondary), settings, section.hidden === 1, ctx.themeColours ?? {});
+  for (const entry of fidelity) ctx.warn(fidelityWarning(entry, ctx.pageSlug, section.id));
   const mint = (n: number): string => nodeId(ctx.legacyHubId, ctx.legacyPageId, section.id, EXTRA_ORDINAL_BASE + n);
 
   if (!mapping) {
@@ -305,10 +332,10 @@ export function mapSection(section: LegacySection, ordinal: number, ctx: MapCont
   const columns = legacyChildren
     .map((child, i) =>
       lookupMapping(child.type, 'block') || child.type === 'column'
-        ? blockNode(child, i, ctx)
+        ? blockNode(child, i, ctx, legacyChildren.length)
         : ctx.mapElement(child, i),
     )
     .filter((n): n is CatalogNode => n !== null);
-  const layout: CatalogNode = { id: mint(0), kind: 'row', settings: layoutRowSettings(columns.length), children: columns };
+  const layout: CatalogNode = { id: mint(0), kind: 'row', settings: { ...LAYOUT_ROW_SETTINGS }, children: columns };
   return sectionContainer(id, mapping.template ?? 'row', surface, [layout]);
 }

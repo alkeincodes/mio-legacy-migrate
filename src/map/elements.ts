@@ -5,7 +5,11 @@ import { nodeId } from './nodeId.js';
 import type { PlanWarning } from './plan.js';
 import { assetRef, playlistRef } from './sections.js';
 import { docToHtml, docToText, hasPersonalisation, parseDoc } from './tiptap.js';
-import { buttonSettingsFor, headlineSettingsFor, imageSettingsFor, textSettingsFor } from './style.js';
+import { elementProfile } from './profile/element.js';
+import { DEFAULT_HUB_PROFILE } from './profile/hub.js';
+import type { HubStyleProfile } from './profile/types.js';
+import { fidelityWarning, type FidelityEntry } from './translate/fidelity.js';
+import { buttonSettings, headlineSettings, imageSettings, textSettings } from './translate/leaf.js';
 
 export interface ElementContext {
   legacyHubId: number;
@@ -22,6 +26,12 @@ export interface ElementContext {
   resolvePageSlug?(legacySlug: string): string;
   /** The V3 slug of a legacy page by id, for buttons whose target is a page row. */
   pageSlugById?(legacyPageId: number): string | null;
+  /** The hub theme's style profile; defaults to the SCSS base. */
+  hubProfile?: HubStyleProfile;
+  /** Content width of the enclosing column at 1240px, for image cap fidelity. */
+  columnContentWidth?: number | null;
+  /** The button background the hub primary was set to, so majority buttons raise no colour entry. */
+  dominantButtonBackground?: string | null;
 }
 
 function parseSettings(raw: unknown): Record<string, unknown> {
@@ -66,6 +76,13 @@ export function mapElement(
 
   const id = nodeId(ctx.legacyHubId, ctx.legacyPageId, section.id, ordinal);
   const settings = parseSettings(section.settings);
+  const profile = elementProfile(section, ctx.hubProfile ?? DEFAULT_HUB_PROFILE);
+  const report = (entries: FidelityEntry[]): void => {
+    for (const entry of entries) {
+      if (entry.property === 'button.colours' && ctx.dominantButtonBackground && entry.legacy.startsWith(ctx.dominantButtonBackground)) continue;
+      ctx.warn(fidelityWarning(entry, ctx.pageSlug, section.id));
+    }
+  };
   // On the real hub `label` is the element's display name ("Headline", "Paragraph",
   // "Button"); the text lives in a TipTap document in `title` (headline),
   // `settings.value` (paragraph) or `settings.link.label` (button). A row with no
@@ -86,28 +103,34 @@ export function mapElement(
     case 'headline': {
       const doc = parseDoc(section.title);
       warnPersonalisation(doc);
-      const isSubheadline = /^subheadline/i.test(section.label ?? '') || settings['size'] === 'medium';
       const headlineText = doc ? docToText(doc) : isDisplayLabel(content) ? '' : content;
-      if (!headlineText) return null;
-      return { id, kind: 'headline', value: headlineText, settings: headlineSettingsFor(settings, isSubheadline) };
+      if (!headlineText || profile.kind !== 'headline') return null;
+      const headline = headlineSettings(profile);
+      report(headline.fidelity);
+      return { id, kind: 'headline', value: headlineText, settings: headline.settings };
     }
 
     case 'text': {
       const doc = parseDoc(settings['value']);
       warnPersonalisation(doc);
-      const out = textSettingsFor(settings);
+      if (profile.kind !== 'text') return null;
+      const text = textSettings(profile);
+      report(text.fidelity);
       // The V3 text node renders its value as plain text (tags show literally), so
       // the document is flattened; bold, links and lists are lost and reported.
       if (doc && /<(strong|em|u|a |ul|ol)/.test(docToHtml(doc))) {
         ctx.warn({ pageSlug: ctx.pageSlug, legacySectionId: section.id, type: 'approximated', reason: 'legacy paragraph carries formatting (bold, links or a list) that the V3 text node cannot show; flattened to plain text' });
       }
-      const text = doc ? docToText(doc) : isDisplayLabel(content) ? '' : content;
-      if (!text) return null;
-      return { id, kind: 'text', value: text, settings: out };
+      const textValue = doc ? docToText(doc) : isDisplayLabel(content) ? '' : content;
+      if (!textValue) return null;
+      return { id, kind: 'text', value: textValue, settings: text.settings };
     }
 
     case 'image': {
-      const out = imageSettingsFor(settings, section.title ?? '');
+      if (profile.kind !== 'image') return null;
+      const image = imageSettings(profile, section.title ?? '', ctx.columnContentWidth ?? null);
+      report(image.fidelity);
+      const out = image.settings;
       // The legacy image element shows settings.thumbnail.url (a Hub-owned media
       // conversion), even when it also links a File, and that File may be a video.
       // So the thumbnail comes first and the linked File's original is the fallback.
@@ -174,7 +197,10 @@ export function mapElement(
       } else {
         action = actionFor(url, ctx.hubOrigins ?? HUB_ORIGINS, ctx.resolvePageSlug);
       }
-      return { id, kind: 'button', value: label, settings: buttonSettingsFor(settings, action, link?.['newTab'] === true) };
+      if (profile.kind !== 'button') return null;
+      const button = buttonSettings(profile, settings, action, link?.['newTab'] === true);
+      report(button.fidelity);
+      return { id, kind: 'button', value: label, settings: button.settings };
     }
 
     case 'line-break':

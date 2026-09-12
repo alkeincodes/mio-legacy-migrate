@@ -29,7 +29,7 @@ describe('mapElement', () => {
       id: nodeId(7, 100, 21000, 0),
       kind: 'headline',
       value: 'Build better men',
-      settings: { level: 2, weight: 700, size: 'large-title', align: 'center' },
+      settings: { level: 2, weight: 700, align: 'center' },
     });
   });
 
@@ -146,7 +146,7 @@ describe('image stored as settings.thumbnail.url', () => {
     const warnings: PlanWarning[] = [];
     const node = mapElement(section, 3, { ...ctx(warnings), assetForUrl: () => null });
     expect(node?.value).toBe('https://elsewhere.example.com/pic.png');
-    expect(warnings[0]?.reason).toContain('not in the asset manifest');
+    expect(warnings.find((w) => w.type === 'approximated')?.reason).toContain('not in the asset manifest');
   });
 });
 
@@ -162,11 +162,14 @@ describe('links to renamed pages', () => {
 describe('real legacy content shapes', () => {
   const doc = (text: string) => JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
 
-  it('headline: reads the TipTap document in title, and a Subheadline label means level 3', () => {
+  it('headline: reads the TipTap document in title; settings.size decides the level, the label only when size is missing', () => {
+    // Headline.vue:20-32 reads settings.size alone; the editor derives the label from it.
     const section = { ...fixture('headline'), label: 'Subheadline', title: doc('Build better men') };
     const node = mapElement(section, 0, ctx());
     expect(node?.value).toBe('Build better men');
-    expect(node?.settings?.['level']).toBe(3);
+    expect(node?.settings?.['level']).toBe(2);
+    const unsized = { ...section, settings: JSON.stringify({ align: 'center' }) };
+    expect(mapElement(unsized, 0, ctx())?.settings?.['level']).toBe(3);
   });
 
   it('text: reads the TipTap document in settings.value as plain text, because the V3 text node shows tags literally', () => {

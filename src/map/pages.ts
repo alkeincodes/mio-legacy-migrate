@@ -6,6 +6,8 @@ import { mapElement } from './elements.js';
 import { nodeId } from './nodeId.js';
 import type { PlanAccessRule, PlanExcludedPage, PlanPage, PlanWarning } from './plan.js';
 import { mapSection, type MapContext } from './sections.js';
+import { hubStyleProfile } from './profile/hub.js';
+import { dominantButtonColour } from './style.js';
 import { resolveGate } from './visibility.js';
 
 /**
@@ -114,6 +116,8 @@ export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
 
   const themeSettings = parseJsonObject(bundle.theme?.settings);
   const themeColours = (themeSettings['colors'] ?? {}) as { primary?: string; secondary?: string };
+  const hubProfile = hubStyleProfile(themeSettings);
+  const dominantButtonBackground = dominantButtonColour(bundle.sections)?.background ?? null;
   const assetByUrl = new Map(bundle.assets.map((a) => [a.cdnUrl, { legacyMediaId: a.legacyMediaId, variant: a.variant }]));
 
   const sectionsByParent = new Map<number, LegacySection[]>();
@@ -188,8 +192,13 @@ export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
       mediaIdForSection: (s) => (s.model_type === MORPH_FILE && s.model_id !== null ? mediaByFileId.get(s.model_id) ?? null : null),
       assetForUrl: (url) => assetByUrl.get(url) ?? null,
       themeColours,
-      mapElement: (section, ordinal) =>
+      hubProfile,
+      dominantButtonBackground,
+      mapElement: (section, ordinal, extra) =>
         mapElement(section, ordinal, {
+          hubProfile,
+          dominantButtonBackground,
+          columnContentWidth: extra?.columnContentWidth ?? null,
           legacyHubId: bundle.header.legacyHubId,
           legacyPageId: page.id,
           pageSlug: slug,

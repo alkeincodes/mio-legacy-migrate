@@ -92,7 +92,7 @@ describe('mapSection, container level', () => {
   it('carries the section surface the recipe expects: padding, background, maxWidth', () => {
     const fixture = loadFixture('row');
     const node = mapSection(fixture.section, 0, contextFor(fixture, []));
-    expect(node.settings).toMatchObject({ maxWidth: 'content', padding: 0, surface: { padding: 'sm', background: { type: 'custom-color', value: '#101820' } } });
+    expect(node.settings).toMatchObject({ maxWidth: 'content', padding: 0, surface: { padding: '50px 0', background: { type: 'custom-color', value: '#101820' } } });
   });
 
   it('maps a grid of one playlist onto the catalog playlist-grid recipe bound to that playlist', () => {
