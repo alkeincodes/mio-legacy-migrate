@@ -72,12 +72,14 @@ type), and `marker` (which run created it).
 - `apply --assets-only` and `apply --mode upsert` both exit with a message naming
   the milestone they belong to.
 - Live calls are not migrated. No legacy table backs them.
-- Button chrome is carried by a shell, not by the button. V3's button has
-  `variant` and `size` only, so every legacy button lands on `size: lg` inside a
-  shrink-wrapped stack painted in the button's fill colour with the legacy
-  corners, padding and shadow (`clip: true` hides the fill's hover growth).
-  What the shell cannot give, the font weight (V3 draws 400, legacy 700) and a
-  border, is reported as a hub-wide `fidelity` warning.
+- Button chrome is not carried, because V3's button has no setting for it. The
+  legacy theme's (or the element's) radius, padding, shadow, border and weight
+  are read from the hub data, but the V3 button takes `variant` and `size` only,
+  so every legacy button lands on `size: lg` (46px tall, 14px sides, the hub's
+  control radius, weight 400) and the difference is reported as one `fidelity`
+  warning per distinct chrome. The rule throughout: a legacy value goes onto the
+  V3 setting that exists for it; when none exists, the gap is V3's and is
+  recorded, not worked around.
 - Image caps outside 128/352px snap to the nearest or fill the column; square
   images get V3's smallest radius (12px); an image border becomes a 1px hairline.
   Each is a `fidelity` warning with the legacy and V3 values.
