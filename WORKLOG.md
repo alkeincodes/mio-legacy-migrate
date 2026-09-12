@@ -317,3 +317,13 @@ Plan plans/hub-38827-dacb2cffe88e.json applied (resume, exit 0). Live:
 shells 171x50 and 219x50, radius 0, fill #5770D1, overflow hidden, shadow on,
 32px apart. Screenshot matches the legacy hero apart from the weight.
 
+## 2026-09-12 (later): button shell reverted
+
+Decision from the user: the script migrates hub data onto the V3 settings that
+exist for it; where V3 has no setting (button radius, padding, shadow,
+border, weight) that is V3's limitation, recorded as fidelity, not worked
+around. The shell also froze the fill colour into the page tree, which would
+drift the day the hub primary changes. Reverted (653b979), README rule
+restated, plan f0831784bfc4 re-applied (resume, exit 0). Live buttons are
+V3's lg again; `button.chrome` fidelity entry back, count 81.
+
