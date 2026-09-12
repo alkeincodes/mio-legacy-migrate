@@ -8,8 +8,16 @@ export const PLAN_VERSION = 1 as const;
 export interface PlanWarning {
   pageSlug: string | null;
   legacySectionId: number | null;
-  type: 'approximated' | 'dropped' | 'access-unmapped' | 'asset-pending' | 'excluded';
+  type: 'approximated' | 'dropped' | 'access-unmapped' | 'asset-pending' | 'excluded' | 'fidelity';
   reason: string;
+  /** fidelity only: the styling property, e.g. 'button.chrome', 'section.ink', 'image.maxWidth'. */
+  property?: string;
+  /** fidelity only: what legacy paints. */
+  legacy?: string;
+  /** fidelity only: what V3 will paint. */
+  v3?: string;
+  /** fidelity only: how many nodes share this entry after collapse. */
+  count?: number;
 }
 
 export interface PlanHub { title: string; slug: string; description: string | null; isPrivate: boolean }
