@@ -286,8 +286,11 @@ hero in that plan is `padding: '150px 0'`, `ink: light`, right stack
 at gap 8. `apply --dry-run --resume run-2026-09-11T19-49-29-036Z-b3f055c6
 --accept-plan-change --rewrite-pages` exits 0 with 3334 operations (the
 dry-run renderer lists plan operations without consulting the ledger, so its
-`page.create` lines are expected on a resume). Not applied; the resume is the
-user's call.
+`page.create` lines are expected on a resume). Applied for real on 2026-09-12 (user's go): the resume above without
+--dry-run, exit 0, 27 page trees rewritten and republished, ledger committed.
+Measured live at 1440px as alkein@membership.io: section padding 150px 0,
+stack justify center at gap 20px, headline 32px bold left, gaps 20 / 21 / 32.
+Buttons are 46px tall, 10px radius, weight 400 (the recorded limit).
 
 Also fixed on the way: `.gitignore` ignored `docs/superpowers/plans/` through
 an unanchored `plans/`, so the M1 plan doc had never been tracked.
