@@ -382,3 +382,12 @@ the Attachment tile with a "Training: Attachment" link, two picture-only
 tiles. Radar artifact of all recorded limitations:
 https://claude.ai/code/artifact/c8596a7b-c09a-4839-a8e1-829e5744db52
 
+## 2026-09-12 (later): tiles are pictures, no invented button
+
+User's rule restated: legacy shows no button on a tile, so V3 shows none.
+The link a legacy tile carries has no home in V3 (no clickable image tile),
+so it is recorded as lost, with its target, under fidelity `tile.link`
+(75 tiles on ManTalks). Only `carousel-cta` cards keep a button because
+legacy draws one there. Plan hub-38827-c616706e9326 applied 15:54Z, exit 0,
+6 pages rewritten. 529 tests.
+
