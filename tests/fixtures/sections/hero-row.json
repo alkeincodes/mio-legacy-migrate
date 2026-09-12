@@ -1,0 +1,62 @@
+{
+  "section": {
+    "id": 3398809, "hub_id": 38827, "page_id": 280338, "parent_id": null,
+    "model_type": null, "model_id": null, "hidden": null, "type": "row",
+    "title": null, "label": null,
+    "settings": "{\"styles\":{\"padding\":{\"top\":\"150\",\"show\":true,\"bottom\":\"150\"},\"visibility\":\"desktop\"},\"columns\":{\"count\":1},\"animation\":{\"settings\":{\"type\":\"slide-up\",\"delay\":0,\"easing\":\"linear\",\"enabled\":true,\"duration\":\"0\"}},\"textTheme\":\"custom\",\"thumbnail\":{\"designId\":null,\"is_thumbnail_transparent\":false},\"background\":{\"type\":\"image\",\"color\":\"#878C6A\",\"image\":{\"url\":\"https://cdn.example.com/hero-bg.png\"},\"designId\":null,\"position\":\"center\"},\"textThemeColor\":\"#F7F2E8\"}",
+    "permissions": null, "meta": null, "position": 1, "segment_id": null
+  },
+  "children": [
+    {
+      "id": 3398810, "hub_id": 38827, "page_id": null, "parent_id": 3398809,
+      "model_type": null, "model_id": null, "hidden": null, "type": "column",
+      "title": null, "label": null,
+      "settings": "{\"size\":50,\"thumbnail\":{\"designId\":null,\"is_thumbnail_transparent\":false}}",
+      "permissions": null, "meta": null, "position": 1, "segment_id": null
+    },
+    {
+      "id": 3398811, "hub_id": 38827, "page_id": null, "parent_id": 3398809,
+      "model_type": null, "model_id": null, "hidden": null, "type": "column",
+      "title": null, "label": null,
+      "settings": "{\"size\":50,\"styles\":{\"align\":\"center\"},\"thumbnail\":{\"designId\":null,\"is_thumbnail_transparent\":false}}",
+      "permissions": null, "meta": null, "position": 2, "segment_id": null
+    }
+  ],
+  "grandchildren": [
+    {
+      "id": 3516756, "hub_id": 38827, "page_id": null, "parent_id": 3398810,
+      "model_type": null, "model_id": null, "hidden": null, "type": "image",
+      "title": "Wordmark", "label": "Image",
+      "settings": "{\"align\":\"center\",\"styles\":{\"width\":{\"type\":\"custom\",\"value\":250},\"cornerRadius\":{\"show\":true}},\"margins\":{\"top\":0},\"thumbnail\":{\"url\":\"https://cdn.example.com/wordmark.png\",\"is_thumbnail_transparent\":true},\"appearance\":{\"overwrite\":true}}",
+      "permissions": null, "meta": null, "position": 1, "segment_id": null
+    },
+    {
+      "id": 3398812, "hub_id": 38827, "page_id": null, "parent_id": 3398811,
+      "model_type": null, "model_id": null, "hidden": null, "type": "headline",
+      "title": "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"Welcome, member\"}]}]}", "label": "Headline",
+      "settings": "{\"size\":\"large\",\"margins\":{\"top\":0},\"thumbnail\":{\"designId\":null,\"is_thumbnail_transparent\":false}}",
+      "permissions": null, "meta": null, "position": 1, "segment_id": null
+    },
+    {
+      "id": 3398813, "hub_id": 38827, "page_id": null, "parent_id": 3398811,
+      "model_type": null, "model_id": null, "hidden": null, "type": "text",
+      "title": null, "label": "Paragraph",
+      "settings": "{\"value\":\"{\\\"type\\\":\\\"doc\\\",\\\"content\\\":[{\\\"type\\\":\\\"paragraph\\\",\\\"content\\\":[{\\\"type\\\":\\\"text\\\",\\\"text\\\":\\\"A short welcome paragraph.\\\"}]}]}\",\"margins\":{\"top\":0},\"thumbnail\":{\"designId\":null,\"is_thumbnail_transparent\":false}}",
+      "permissions": null, "meta": null, "position": 2, "segment_id": null
+    },
+    {
+      "id": 3424620, "hub_id": 38827, "page_id": null, "parent_id": 3398811,
+      "model_type": "App\\Page", "model_id": 284460, "hidden": null, "type": "button",
+      "title": null, "label": "Button",
+      "settings": "{\"link\":{\"label\":\"Join The Conversation\"},\"type\":\"page\",\"button\":{\"icon\":{\"show\":true,\"alignment\":\"right\",\"illustration\":{\"icon\":\"chat\",\"name\":\"Chat\"}}},\"styles\":{\"theme\":{\"show\":true,\"colors\":{\"text\":\"#F7F2E8\",\"background\":\"#5770D1\"}}},\"margins\":{\"top\":0},\"page_id\":null,\"thumbnail\":{\"is_thumbnail_transparent\":false}}",
+      "permissions": null, "meta": null, "position": 3, "segment_id": null
+    },
+    {
+      "id": 4048781, "hub_id": 38827, "page_id": null, "parent_id": 3398811,
+      "model_type": "App\\Page", "model_id": 284461, "hidden": null, "type": "button",
+      "title": null, "label": "Button",
+      "settings": "{\"link\":{\"label\":\"5-Day Challenge\"},\"type\":\"page\",\"button\":{\"icon\":{\"show\":true,\"alignment\":\"right\",\"illustration\":{\"icon\":\"boxing\",\"name\":\"Boxing\"}}},\"margins\":{\"top\":30},\"page_id\":null,\"thumbnail\":{\"is_thumbnail_transparent\":false}}",
+      "permissions": null, "meta": null, "position": 4, "segment_id": null
+    }
+  ]
+}
