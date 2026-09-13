@@ -234,7 +234,7 @@ describe('navigationItemFor', () => {
 });
 
 describe('playlistsStage', () => {
-  it('creates the playlist on the hub with the marker as description and attaches verified items in position order', async () => {
+  it('creates the playlist on the hub with the marker in meta and attaches verified items in position order', async () => {
     const p = plan({
       playlists: [{ legacyPlaylistId: 42, title: 'Course', description: null, visibility: 'private', items: [{ legacyFileId: 6, position: 1 }, { legacyFileId: 5, position: 0 }] }],
       assets: [
@@ -247,7 +247,8 @@ describe('playlistsStage', () => {
     ctx.store.upsert({ legacyTable: 'media', legacyId: 91234, kind: 'asset', variant: 'original', marker: 'am', v3Id: 'file_5', state: 'verified', runId: 'run-1', createdAt: 'x', updatedAt: 'x', contentHash: 'c', referenceHash: null, revisionToken: null, asset: null });
     await playlistsStage(ctx);
     const create = api.calls.find((c) => c.method === 'POST' && c.path === '/api/v1/teams/team-1/playlists')!;
-    expect((create.body as { data: { attributes: Record<string, unknown> } }).data.attributes).toMatchObject({ description: marker(42), hub_id: 'hub_1', visibility: 'private' });
+    // The marker lives in meta; description is the legacy copy (the bound playlist header renders it).
+    expect((create.body as { data: { attributes: Record<string, unknown> } }).data.attributes).toMatchObject({ description: null, meta: { lgcMarker: marker(42) }, hub_id: 'hub_1', visibility: 'private' });
     const items = api.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/items'));
     expect(items).toHaveLength(1);
     expect((items[0]!.body as { data: { attributes: unknown } }).data.attributes).toEqual({ file_id: 'file_5', position: 0 });
@@ -534,6 +535,16 @@ describe('verifyMemberStage', () => {
     const quiet = fakeApi();
     await verifyMemberStage({ ...ctxFor(plan(), quiet), hubId: 'hub_1', profile: { ...ctx.profile, v3VerifyLoginEmail: '' } } as StageContext);
     expect(quiet.calls).toEqual([]);
+  });
+
+describe('navigationItemFor with a hub slug', () => {
+  it('hub-scopes every internal url href, page items stay by id', () => {
+    const api = fakeApi();
+    const ctx = ctxFor(plan(), api);
+    expect(navigationItemFor(ctx, { type: 'url', label: 'Shop', href: '/shop', position: 0 }, [], 'test2')).toMatchObject({ type: 'url', href: '/test2/shop' });
+    expect(navigationItemFor(ctx, { type: 'url', label: 'Shop', href: '/test2/shop', position: 0 }, [], 'test2')).toMatchObject({ href: '/test2/shop' });
+    expect(navigationItemFor(ctx, { type: 'url', label: 'Home', href: '/', position: 0 }, [], 'test2')).toMatchObject({ href: '/test2' });
+    expect(navigationItemFor(ctx, { type: 'url', label: 'Ext', href: 'https://x.example.com/a', position: 0 }, [], 'test2')).toBeNull();
   });
 });
 

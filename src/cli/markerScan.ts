@@ -10,8 +10,9 @@ import type { LedgerStore } from '../ledger/store.js';
 
 /**
  * The same marker scan apply uses, so `ledger resolve --adopt <id>` can check
- * the id it is handed. Assets carry the marker in `description`; hubs and
- * pages carry it in `meta.lgcMarker`; every other kind uses `description`.
+ * the id it is handed. Assets carry the marker in `description`; hubs, pages
+ * and playlists carry it in `meta.lgcMarker` (playlists made before 2026-09-13
+ * in `description`, so both are checked); every other kind uses `description`.
  */
 export function markerScanner(store: LedgerStore, profileName: string): ListByMarker {
   return async (marker) => {
@@ -48,7 +49,7 @@ export function markerScanner(store: LedgerStore, profileName: string): ListByMa
         const hubId = store.header.targetHubId;
         return hubId ? byMeta(`${team}/hubs/${hubId}/pages/`) : [];
       }
-      case 'playlist': return byDescription(`${team}/playlists`);
+      case 'playlist': return [...new Set([...(await byMeta(`${team}/playlists`)), ...(await byDescription(`${team}/playlists`))])];
       case 'folder': return byDescription(`${team}/folders`);
       case 'achievement': return byDescription(`${team}/achievements`);
       case 'segment': return byDescription(`${team}/segments`);

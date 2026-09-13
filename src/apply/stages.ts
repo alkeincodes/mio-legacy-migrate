@@ -440,6 +440,20 @@ export async function attachFoldersStage(ctx: StageContext): Promise<void> {
 
 // ---------------------------------------------------------------- playlists
 
+/** A playlist created with the marker as its description (before 2026-09-13) gets the legacy description back and the marker in meta. */
+async function reconcilePlaylistDescription(ctx: StageContext, id: string, marker: string, description: string | null): Promise<void> {
+  const current = await ctx.api.get<{ data?: { attributes?: { description?: string | null; meta?: Record<string, unknown> | null } } }>(`${team(ctx)}/playlists/${id}`);
+  const attrs = current.body?.data?.attributes ?? {};
+  const meta = (attrs.meta ?? {}) as Record<string, unknown>;
+  if (attrs.description !== marker && meta['lgcMarker'] === marker) return;
+  await ctx.api.patch(
+    `${team(ctx)}/playlists/${id}`,
+    { data: { type: 'playlists', attributes: { description, meta: { ...meta, lgcMarker: marker } } } },
+    { ifMatch: current.etag ?? undefined },
+  );
+  logger.info('playlist description restored; marker moved to meta', { id });
+}
+
 export async function playlistsStage(ctx: StageContext): Promise<void> {
   for (const playlist of ctx.plan.playlists) {
     const { id, marker } = await ensureRecord(ctx, {
@@ -447,17 +461,21 @@ export async function playlistsStage(ctx: StageContext): Promise<void> {
       legacyId: playlist.legacyPlaylistId,
       kind: 'playlist',
       hash: contentHash(playlist),
-      list: (m) => listByDescription(ctx, `${team(ctx)}/playlists`, m),
+      // Rows made before 2026-09-13 carry the marker in description; both places are scanned.
+      list: async (m) => [...new Set([...(await listByMeta(ctx, `${team(ctx)}/playlists`, m)), ...(await listByDescription(ctx, `${team(ctx)}/playlists`, m))])],
       create: async (m) => {
         const response = await ctx.api.post<{ data: { id: string } }>(`${team(ctx)}/playlists`, {
           data: {
             type: 'playlists',
-            attributes: { title: playlist.title, description: m, visibility: playlist.visibility, hub_id: ctx.hubId },
+            // The bound playlist header renders `description` (mio-hub use-data-source.ts
+            // collection scope), so the marker lives in meta and the legacy copy in description.
+            attributes: { title: playlist.title, description: playlist.description, visibility: playlist.visibility, hub_id: ctx.hubId, meta: { lgcMarker: m } },
           },
         });
         return response.data.id;
       },
     });
+    await reconcilePlaylistDescription(ctx, id, marker, playlist.description);
 
     const entry = ctx.store.find(marker);
     const wanted: Array<{ file_id: string; position: number }> = [];
@@ -663,11 +681,18 @@ export async function removalsStage(ctx: StageContext): Promise<Array<{ legacyPa
 // ---------------------------------------------------------------- navigation
 
 /** V3 stores url items as root-relative paths only (app/hubs/validation.py:329-354). */
+/**
+ * mio-hub resolves a url item by matching its pathname against `/{hub.slug}/...`
+ * (src/lib/hub-shape/route-resolver.ts:90), so every internal href carries the
+ * hub slug; page items are resolved by id and need none.
+ */
 export function navigationItemFor(
   ctx: StageContext,
   item: PlanNavigationItem,
   hubOrigins: string[],
+  hubSlug: string | null = null,
 ): Record<string, unknown> | null {
+  const scoped = (path: string): string => (hubSlug && !path.startsWith(`/${hubSlug}/`) && path !== `/${hubSlug}` ? `/${hubSlug}${path === '/' ? '' : path}` : path);
   if (item.type === 'page') {
     const page = ctx.plan.pages.find((p) => p.slug === item.pageSlugRef);
     const pageId = page ? v3IdOf(ctx, page.legacyPageId) : null;
@@ -686,7 +711,7 @@ export function navigationItemFor(
       ctx.warn(`navigation item "${item.label}" dropped: playlist ${item.playlistRef} has no V3 id`);
       return null;
     }
-    return { type: 'url', label: item.label, href: `/playlists/${playlistId}`, position: item.position };
+    return { type: 'url', label: item.label, href: scoped(`/playlists/${playlistId}`), position: item.position };
   }
   let href = item.href ?? '';
   for (const origin of hubOrigins) {
@@ -696,13 +721,15 @@ export function navigationItemFor(
     ctx.warn(`navigation item "${item.label}" dropped: V3 only stores root-relative links and this one points at ${item.href ?? 'nothing'}`);
     return null;
   }
-  return { type: 'url', label: item.label, href, position: item.position };
+  return { type: 'url', label: item.label, href: scoped(href), position: item.position };
 }
 
 export async function navigationStage(ctx: StageContext, hubOrigins: string[]): Promise<void> {
+  const hub = await ctx.api.get<{ data?: { attributes?: { slug?: string } } }>(`${team(ctx)}/hubs/${ctx.hubId}`);
+  const hubSlug = hub.body?.data?.attributes?.slug ?? ctx.plan.hub.slug;
   const build = (items: PlanNavigationItem[]): Record<string, unknown>[] =>
     items
-      .map((item) => navigationItemFor(ctx, item, hubOrigins))
+      .map((item) => navigationItemFor(ctx, item, hubOrigins, hubSlug))
       .filter((item): item is Record<string, unknown> => item !== null)
       .map((item, position) => ({ ...item, position }));
   const navigation = {
@@ -718,7 +745,6 @@ export async function navigationStage(ctx: StageContext, hubOrigins: string[]): 
   if (home && !homePageId) ctx.warn(`homepage /${home.slug} has no V3 id; the hub homepage descriptor was not set`);
   const attributes: Record<string, unknown> = { navigation };
   if (homePageId) attributes['homepage'] = { kind: 'custom', page_id: homePageId };
-  const hub = await ctx.api.get<unknown>(`${team(ctx)}/hubs/${ctx.hubId}`);
   await ctx.api.patch(
     `${team(ctx)}/hubs/${ctx.hubId}`,
     { data: { type: 'hubs', attributes } },
