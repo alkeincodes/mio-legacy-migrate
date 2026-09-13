@@ -448,7 +448,7 @@ async function reconcilePlaylistDescription(ctx: StageContext, id: string, marke
   if (attrs.description !== marker && meta['lgcMarker'] === marker) return;
   await ctx.api.patch(
     `${team(ctx)}/playlists/${id}`,
-    { data: { type: 'playlists', attributes: { description, meta: { ...meta, lgcMarker: marker } } } },
+    { data: { type: 'playlists', id, attributes: { description, meta: { ...meta, lgcMarker: marker } } } },
     { ifMatch: current.etag ?? undefined },
   );
   logger.info('playlist description restored; marker moved to meta', { id });

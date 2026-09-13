@@ -536,6 +536,7 @@ describe('verifyMemberStage', () => {
     await verifyMemberStage({ ...ctxFor(plan(), quiet), hubId: 'hub_1', profile: { ...ctx.profile, v3VerifyLoginEmail: '' } } as StageContext);
     expect(quiet.calls).toEqual([]);
   });
+});
 
 describe('navigationItemFor with a hub slug', () => {
   it('hub-scopes every internal url href, page items stay by id', () => {
