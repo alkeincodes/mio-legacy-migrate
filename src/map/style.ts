@@ -12,7 +12,12 @@ export type Surface = Record<string, unknown>;
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
 
 /** Legacy `background` to `surface.background`; null when it is the page default. */
-export interface ThemeColours { primary?: string; secondary?: string }
+export interface ThemeColours {
+  primary?: string;
+  secondary?: string;
+  /** What V3 branding.primary is set to (the dominant legacy button colour, else the theme primary). */
+  brandingPrimary?: string;
+}
 
 export function surfaceBackgroundFor(background: Record<string, unknown> | undefined, theme: ThemeColours = {}): Record<string, unknown> | null {
   if (!background) return null;
@@ -30,8 +35,15 @@ export function surfaceBackgroundFor(background: Record<string, unknown> | undef
     // not that colour, so the hex is carried when the theme is known.
     case 'secondary-color':
       return theme.secondary && HEX6.test(theme.secondary) ? { type: 'custom-color', value: theme.secondary } : { type: 'color', token: 'secondary' };
-    case 'primary-color':
-      return theme.primary && HEX6.test(theme.primary) ? { type: 'custom-color', value: theme.primary } : { type: 'color', token: 'primary' };
+    // When V3's primary IS the legacy primary, the token form is the faithful one:
+    // V3 stamps data-bg="primary" on it and a primary button inside inverts to
+    // white on primary, which is what legacy's .variant-primary-color .btn does.
+    case 'primary-color': {
+      const legacy = theme.primary && HEX6.test(theme.primary) ? theme.primary : null;
+      const sameAsBranding = legacy !== null && (theme.brandingPrimary === undefined || theme.brandingPrimary.toLowerCase() === legacy.toLowerCase());
+      if (legacy === null || sameAsBranding) return { type: 'color', token: 'primary' };
+      return { type: 'custom-color', value: legacy };
+    }
     case 'thumbnail':
       return null;
     default:

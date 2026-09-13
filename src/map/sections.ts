@@ -347,10 +347,19 @@ export function mapSection(section: LegacySection, ordinal: number, ctx: MapCont
   const titleNode: CatalogNode | null = titleShown && titleText
     ? { id: mint(9), kind: 'headline', value: titleText, settings: { level: 2, weight: 700 } }
     : null;
-  // Legacy grid, scroll and content-grid sections draw one tile per block
-  // (Grid.vue, Scroll.vue, ContentGrid.vue via CustomGridBlock); compact,
-  // playlist, recently-watched and carousel list one playlist's files.
-  const drawsTiles = section.type === 'grid' || section.type === 'scroll' || section.type === 'content-grid';
+  // Legacy grid, scroll and content-grid sections draw one tile per block when
+  // they have blocks (Scroll/Inner.vue: settings.type "custom"); with a playlist
+  // as their model and no blocks (settings.type "playlist", the default) they
+  // draw that playlist's head and files, the catalog's bound Playlist variant.
+  const drawsTiles = legacyChildren.length > 0 && (section.type === 'grid' || section.type === 'scroll' || section.type === 'content-grid');
+  const boundPlaylist = section.model_type?.endsWith('Playlist') && section.model_id !== null && legacyChildren.length === 0 && settings['type'] !== 'custom';
+  if (boundPlaylist && mapping.template !== null && ['compact', 'grid', 'carousel', 'content-grid'].includes(mapping.template)) {
+    const node = bindPlaylist(recipe(mapping.template === 'compact' ? 'compact-playlist' : 'grid-playlist', ctx, section.id), playlistRef(section.model_id!));
+    node.id = id;
+    node.template = mapping.template;
+    node.settings = { ...(node.settings ?? {}), surface: { ...((node.settings?.['surface'] as Record<string, unknown>) ?? {}), ...surface } };
+    return node;
+  }
 
   // A strip of one playlist's files takes the catalog's own data-bound recipe.
   if (playlistBlocks.length > 0 && !drawsTiles && (mapping.template === 'grid' || mapping.template === 'compact' || mapping.template === 'carousel' || mapping.template === 'content-grid')) {

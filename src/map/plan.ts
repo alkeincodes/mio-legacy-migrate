@@ -115,6 +115,8 @@ export interface PlanNavigationItem {
   label: string;
   href?: string;
   pageSlugRef?: string;
+  /** A url item that opens a migrated playlist; apply resolves it to /playlists/<v3 id>. */
+  playlistRef?: number;
   position: number;
 }
 

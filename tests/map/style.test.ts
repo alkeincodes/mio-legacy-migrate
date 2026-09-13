@@ -23,4 +23,10 @@ describe('shared style vocabulary', () => {
     expect(dominantButtonColour([btn('#5770D1'), btn('#5770D1'), btn('#5770D1'), btn('#000000')])).toEqual({ background: '#5770D1', text: '#FFFFFF' });
     expect(dominantButtonColour([btn('#5770D1'), btn('#000000')])).toBeNull();
   });
+
+  it('a primary-colour band is the primary token when V3 primary is the legacy primary, else the hex', () => {
+    expect(surfaceBackgroundFor({ type: 'primary-color' }, { primary: '#5F7FEC', brandingPrimary: '#5f7fec' })).toEqual({ type: 'color', token: 'primary' });
+    expect(surfaceBackgroundFor({ type: 'primary-color' }, { primary: '#F7F2E8', brandingPrimary: '#5770D1' })).toEqual({ type: 'custom-color', value: '#F7F2E8' });
+  });
 });
+

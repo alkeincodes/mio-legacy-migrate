@@ -275,5 +275,17 @@ describe('a legacy scroll of tiles (ManTalks Begin Training)', () => {
     expect(card?.children?.map((k) => k.kind)).toEqual(['image', 'text']);
     expect(card?.children?.[1]).toMatchObject({ kind: 'text', value: 'Book a call' });
   });
+
+  it('a scroll section bound to a playlist with no blocks takes the catalog playlist recipe with its head', () => {
+    const fixture = loadFixture('scroll-tiles');
+    const section = { ...fixture.section, model_type: 'App\\Playlist', model_id: 76830, settings: JSON.stringify({ type: 'playlist', background: { type: 'custom-color', color: '#FFFFFF' } }) };
+    const node = mapSection(section, 1, contextFor({ ...fixture, section, children: [] }, []));
+    expect(node.template).toBe('compact');
+    expect(node.dataSource).toEqual({ type: 'playlist', id: playlistRef(76830) });
+    const walk = (n: CatalogNode): CatalogNode[] => [n, ...(n.children ?? []).flatMap(walk)];
+    expect(walk(node).some((n) => n.kind === 'progress-ring')).toBe(true);
+    expect(walk(node).some((n) => n.repeat)).toBe(true);
+    expect((node.settings?.['surface'] as Record<string, unknown>)['background']).toEqual({ type: 'custom-color', value: '#FFFFFF' });
+  });
 });
 

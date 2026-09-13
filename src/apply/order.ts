@@ -66,8 +66,9 @@ export function resolveRefs(tree: CatalogNode, resolver: RefResolver): CatalogNo
       const asset = ASSET_REF.exec(action.value);
       if (playlist) {
         const id = resolver.playlist(Number(playlist[1]));
-        // A playlist opens from the hub's content page; the id is passed as the route's query.
-        next.settings = { ...node.settings, action: { ...action, type: 'page', value: id === null ? '/content' : `/content?playlist=${id}` } };
+        // V3's button has a typed playlist action (mio-hub action.ts: /<hub>/playlists/<id>);
+        // a playlist that never landed on V3 falls back to the content browse page.
+        next.settings = { ...node.settings, action: id === null ? { ...action, type: 'page', value: '/content' } : { ...action, type: 'playlist', value: id } };
       } else if (asset) {
         const resolved = resolver.asset(Number(asset[1]), asset[2] ?? 'original');
         next.settings = { ...node.settings, action: { ...action, type: 'url', value: 'url' in resolved ? resolved.url : '' } };

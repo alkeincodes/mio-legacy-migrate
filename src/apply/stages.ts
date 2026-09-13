@@ -680,6 +680,14 @@ export function navigationItemFor(
   if (item.type === 'discussions') {
     return { type: 'discussions', label: item.label, position: item.position };
   }
+  if (item.playlistRef !== undefined) {
+    const playlistId = v3IdOf(ctx, item.playlistRef);
+    if (!playlistId) {
+      ctx.warn(`navigation item "${item.label}" dropped: playlist ${item.playlistRef} has no V3 id`);
+      return null;
+    }
+    return { type: 'url', label: item.label, href: `/playlists/${playlistId}`, position: item.position };
+  }
   let href = item.href ?? '';
   for (const origin of hubOrigins) {
     if (href.startsWith(origin)) href = href.slice(origin.length) || '/';

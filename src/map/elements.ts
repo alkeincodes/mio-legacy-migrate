@@ -121,7 +121,11 @@ export function mapElement(
       if (doc && /<(strong|em|u|a |ul|ol)/.test(docToHtml(doc))) {
         ctx.warn({ pageSlug: ctx.pageSlug, legacySectionId: section.id, type: 'approximated', reason: 'legacy paragraph carries formatting (bold, links or a list) that the V3 text node cannot show; flattened to plain text' });
       }
-      const textValue = doc ? docToText(doc) : isDisplayLabel(content) ? '' : content;
+      // Paragraph.vue renders settings.value: a TipTap document on newer rows, a
+      // plain string (sometimes with tags) on older ones; the label is never content.
+      const raw = settings['value'];
+      const plain = typeof raw === 'string' && !doc ? raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+      const textValue = doc ? docToText(doc) : plain || (isDisplayLabel(content) ? '' : content);
       if (!textValue) return null;
       return { id, kind: 'text', value: textValue, settings: text.settings };
     }

@@ -211,4 +211,10 @@ describe('empty elements', () => {
     expect(mapElement(section, 2, ctx())).toBeNull();
     expect(mapElement({ ...fixture('text'), label: 'Paragraph - Copy', settings: '{}' }, 2, ctx())).toBeNull();
   });
+
+  it('text: a plain-string settings.value is the paragraph, tags stripped; the label is never content', () => {
+    const section = { ...fixture('text'), label: 'Paragraph', settings: JSON.stringify({ value: 'Lorem <b>ipsum</b> dolor.', margins: { top: 0 } }) };
+    expect(mapElement(section, 0, ctx())?.value).toBe('Lorem ipsum dolor.');
+  });
 });
+

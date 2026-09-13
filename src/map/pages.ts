@@ -115,9 +115,10 @@ export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
   }
 
   const themeSettings = parseJsonObject(bundle.theme?.settings);
-  const themeColours = (themeSettings['colors'] ?? {}) as { primary?: string; secondary?: string };
+  const colours = (themeSettings['colors'] ?? {}) as { primary?: string; secondary?: string };
   const hubProfile = hubStyleProfile(themeSettings);
   const dominantButtonBackground = dominantButtonColour(bundle.sections)?.background ?? null;
+  const themeColours = { ...colours, brandingPrimary: dominantButtonBackground ?? colours.primary };
   const assetByUrl = new Map(bundle.assets.map((a) => [a.cdnUrl, { legacyMediaId: a.legacyMediaId, variant: a.variant }]));
 
   const sectionsByParent = new Map<number, LegacySection[]>();

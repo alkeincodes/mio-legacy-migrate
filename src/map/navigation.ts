@@ -1,5 +1,5 @@
 import type { Bundle } from '../extract/bundle.js';
-import { MORPH_PAGE } from '../extract/queries.js';
+import { MORPH_PAGE, MORPH_PLAYLIST } from '../extract/queries.js';
 import type { PlanNavigation, PlanNavigationItem, PlanWarning } from './plan.js';
 import { parseJsonObject } from '../extract/json.js';
 
@@ -90,6 +90,18 @@ export function mapNavigation(
         continue;
       }
       bucket.push({ type: 'page', label, pageSlugRef: slug, position: bucket.length });
+      continue;
+    }
+
+    // A playlist menu item: V3 navigation has page, url and discussions items only,
+    // so it becomes a url item whose target apply resolves once the playlist exists.
+    if (item.type === 'playlist' || item.model_type === MORPH_PLAYLIST) {
+      const playlist = item.model_id === null ? undefined : bundle.playlists.find((p) => p.id === item.model_id);
+      if (!playlist) {
+        warnings.push({ pageSlug: null, legacySectionId: null, type: 'approximated', reason: `navigation item ${item.id} points at legacy playlist ${String(item.model_id)}, which is not in the bundle; dropped from navigation` });
+        continue;
+      }
+      bucket.push({ type: 'url', label: (label || playlist.title).slice(0, MAX_LABEL), playlistRef: playlist.id, position: bucket.length });
       continue;
     }
 
