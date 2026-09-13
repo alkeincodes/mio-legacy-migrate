@@ -1,6 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
-import { loadEnv, apiKeyForProfileOrNull, withProfileLogins, type Env } from '../config/env.js';
+import { loadEnv, apiKeyForProfileOrNull, withProfileLogins, secretsOf, type Env } from '../config/env.js';
+import { resolveApiAuth } from '../apply/auth.js';
+import { ApiClient } from '../apply/api.js';
+import { Budget, budgetIdentity } from '../apply/budget.js';
+import { LedgerStore } from '../ledger/store.js';
+import { logger } from '../log/logger.js';
 import { loadProfile, targetOf, type Profile } from '../config/profile.js';
 import { ledgerDir } from '../ledger/store.js';
 import { readPlan } from '../map/plan.js';
@@ -59,20 +64,37 @@ export interface ApplyPlanning {
  * How this run applies: fresh (needs a slug) or resumed (slug fixed at
  * creation); assets copied only when asked for and the V3 keys exist.
  */
-export function planApply(input: { existingRun: string | null; hubSlug: string | null; assets: boolean; v3KeysPresent: boolean }): ApplyPlanning {
+export function planApply(input: { existingRun: string | null; hubSlug: string | null; existingSlug: string | null; assets: boolean; v3KeysPresent: boolean }): ApplyPlanning {
   if (input.existingRun === null && !input.hubSlug) {
     throw new Error('the first run creates the hub, so --hub-slug <slug> is required (the V3 URL becomes <hubBase>/<slug>; global, auto-suffixed if taken, fixed for the life of the hub)');
+  }
+  if (input.existingRun !== null && !input.existingSlug) {
+    throw new Error(`run ${input.existingRun} exists but its hub's slug could not be read; the resume must carry the slug the hub was created with`);
   }
   if (input.assets && !input.v3KeysPresent) {
     throw new Error('--assets needs V3_AWS_ACCESS_KEY_ID and V3_AWS_SECRET_ACCESS_KEY in .env; without them media stays legacy-linked or pending');
   }
   return {
     resumeRunId: input.existingRun,
-    hubSlug: input.existingRun === null ? input.hubSlug : null,
+    // A resume hashes the hub record with the slug it was created under (the ledger's
+    // hub entry was); passing anything else reads as a second plan and is refused.
+    hubSlug: input.existingRun === null ? input.hubSlug : input.existingSlug,
     skipAssets: !input.assets,
     acceptPlanChange: input.existingRun !== null,
     rewritePages: input.existingRun !== null,
   };
+}
+
+/** The slug the hub behind an existing run answers at, read from the API; null when the run never made a hub. */
+async function existingHubSlug(profile: Profile, env: Env, dir: string, runId: string): Promise<string | null> {
+  const store = LedgerStore.open(dir, runId);
+  const hubId = store.header.targetHubId;
+  if (!hubId) return null;
+  const auth = await resolveApiAuth(profile, env);
+  logger.setSecrets([...secretsOf(env), auth.token]);
+  const api = new ApiClient({ profile, apiKey: auth.token, budget: Budget.open(budgetIdentity(profile.teamId, auth.budgetSubject)) });
+  const { body } = await api.get<{ data: { attributes: { slug?: string } } }>(`/api/v1/teams/${profile.teamId}/hubs/${hubId}`);
+  return body.data.attributes.slug ?? null;
 }
 
 /** Which identity apply will call the API as, or the reason it cannot. */
@@ -136,7 +158,11 @@ export async function runMigrate(opts: MigrateOptions): Promise<void> {
   t = Date.now();
   const dir = ledgerDir(profile.name, plan.legacyHubId);
   const existingRun = latestRun(dir);
-  const planning = planApply({ existingRun, hubSlug: opts.hubSlug, assets: opts.assets, v3KeysPresent });
+  const existingSlug = existingRun ? await existingHubSlug(profile, env, dir, existingRun) : null;
+  if (existingRun && opts.hubSlug && existingSlug && opts.hubSlug !== existingSlug) {
+    process.stdout.write(`      note: --hub-slug ${opts.hubSlug} ignored; the hub already lives at /${existingSlug} and a slug cannot change\n`);
+  }
+  const planning = planApply({ existingRun, hubSlug: opts.hubSlug, existingSlug, assets: opts.assets, v3KeysPresent });
   const slug = planning.hubSlug ?? plan.hub.slug;
   if (opts.dryRun) {
     await runApply({

@@ -18,15 +18,16 @@ describe('latestRun', () => {
 });
 
 describe('planApply', () => {
-  it('a first run needs a slug and creates; a rerun resumes with the plan-change flags and ignores the slug', () => {
-    expect(planApply({ existingRun: null, hubSlug: 'web-dev', assets: false, v3KeysPresent: false })).toEqual({ resumeRunId: null, hubSlug: 'web-dev', skipAssets: true, acceptPlanChange: false, rewritePages: false });
-    expect(planApply({ existingRun: 'run-1', hubSlug: 'other', assets: false, v3KeysPresent: false })).toEqual({ resumeRunId: 'run-1', hubSlug: null, skipAssets: true, acceptPlanChange: true, rewritePages: true });
-    expect(() => planApply({ existingRun: null, hubSlug: null, assets: false, v3KeysPresent: false })).toThrow(/--hub-slug/);
+  it('a first run needs a slug and creates; a rerun resumes with the plan-change flags and the slug the hub already has', () => {
+    expect(planApply({ existingRun: null, hubSlug: 'web-dev', existingSlug: null, assets: false, v3KeysPresent: false })).toEqual({ resumeRunId: null, hubSlug: 'web-dev', skipAssets: true, acceptPlanChange: false, rewritePages: false });
+    expect(planApply({ existingRun: 'run-1', hubSlug: 'other', existingSlug: 'test2', assets: false, v3KeysPresent: false })).toEqual({ resumeRunId: 'run-1', hubSlug: 'test2', skipAssets: true, acceptPlanChange: true, rewritePages: true });
+    expect(() => planApply({ existingRun: 'run-1', hubSlug: null, existingSlug: null, assets: false, v3KeysPresent: false })).toThrow(/slug could not be read/);
+    expect(() => planApply({ existingRun: null, hubSlug: null, existingSlug: null, assets: false, v3KeysPresent: false })).toThrow(/--hub-slug/);
   });
 
   it('copies assets only when asked and the V3 keys exist', () => {
-    expect(planApply({ existingRun: 'run-1', hubSlug: null, assets: true, v3KeysPresent: true }).skipAssets).toBe(false);
-    expect(() => planApply({ existingRun: 'run-1', hubSlug: null, assets: true, v3KeysPresent: false })).toThrow(/V3_AWS_ACCESS_KEY_ID/);
+    expect(planApply({ existingRun: 'run-1', hubSlug: null, existingSlug: 's', assets: true, v3KeysPresent: true }).skipAssets).toBe(false);
+    expect(() => planApply({ existingRun: 'run-1', hubSlug: null, existingSlug: 's', assets: true, v3KeysPresent: false })).toThrow(/V3_AWS_ACCESS_KEY_ID/);
   });
 });
 
