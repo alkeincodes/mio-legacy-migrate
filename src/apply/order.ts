@@ -2,7 +2,7 @@ import type { CatalogNode } from '../map/catalog.js';
 import type { PlanPage } from '../map/plan.js';
 
 export type StageName =
-  | 'hub' | 'branding' | 'tags' | 'segments' | 'accessRules' | 'folders' | 'assets'
+  | 'hub' | 'branding' | 'verifyMember' | 'tags' | 'segments' | 'accessRules' | 'folders' | 'assets'
   | 'playlists' | 'pageDrafts' | 'pageTrees' | 'removals' | 'navigation' | 'spaces' | 'achievements';
 
 /**
@@ -13,7 +13,7 @@ export type StageName =
  * ordering; achievements come last because they reference pages and playlists.
  */
 export const APPLY_ORDER: StageName[] = [
-  'hub', 'branding', 'tags', 'segments', 'accessRules', 'folders', 'assets',
+  'hub', 'branding', 'verifyMember', 'tags', 'segments', 'accessRules', 'folders', 'assets',
   'playlists', 'pageDrafts', 'pageTrees', 'removals', 'navigation', 'spaces', 'achievements',
 ];
 

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {
   accessRulesStage, achievementsStage, attachFoldersStage, foldersStage, hubStage,
   navigationItemFor, navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, refResolverFor, removalsStage,
-  segmentsStage, spacesStage, tagsStage, assetReferences, type StageContext,
+  segmentsStage, spacesStage, tagsStage, assetReferences, type StageContext, verifyMemberStage,
 } from '../../src/apply/stages.js';
 import type { ApiClient } from '../../src/apply/api.js';
 import { LedgerStore } from '../../src/ledger/store.js';
@@ -510,3 +510,30 @@ describe('navigationStage homepage', () => {
     expect((patch.body as { data: { attributes: Record<string, unknown> } }).data.attributes).not.toHaveProperty('homepage');
   });
 });
+
+describe('verifyMemberStage', () => {
+  it('adds the profile verify login to the hub as a member, creating the team contact when the team lacks it', async () => {
+    const api = fakeApi({ gets: { '/api/teams/': { body: { data: [] } } }, postId: 'tc_1' });
+    const ctx = { ...ctxFor(plan(), api), hubId: 'hub_1' } as StageContext;
+    ctx.profile = { ...ctx.profile, teamId: 'team_1', v3VerifyLoginEmail: 'member@example.com' };
+    // The contact create answers with the global contact id the membership needs.
+    api.post = (async (path: string, body: unknown) => { api.calls.push({ method: 'POST', path, body, opts: {} }); return { data: { id: 'tc_1', attributes: { contact_id: 'contact_9', email: 'member@example.com' } } }; }) as typeof api.post;
+    await verifyMemberStage(ctx);
+    const posts = api.calls.filter((c) => c.method === 'POST');
+    expect(posts[0]?.path).toBe('/api/teams/team_1/contacts');
+    expect(posts[1]?.path).toBe('/api/admin/teams/team_1/hubs/hub_1/members');
+    expect(posts[1]?.body).toEqual({ data: { type: 'hub_memberships', attributes: { contact_id: 'contact_9' } } });
+  });
+
+  it('reuses an existing team contact and does nothing without a verify login', async () => {
+    const api = fakeApi({ gets: { '/api/teams/': { body: { data: [{ id: 'tc_1', attributes: { contact_id: 'contact_9', email: 'Member@example.com' } }] } } } });
+    const ctx = { ...ctxFor(plan(), api), hubId: 'hub_1' } as StageContext;
+    ctx.profile = { ...ctx.profile, teamId: 'team_1', v3VerifyLoginEmail: 'member@example.com' };
+    await verifyMemberStage(ctx);
+    expect(api.calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual(['/api/admin/teams/team_1/hubs/hub_1/members']);
+    const quiet = fakeApi();
+    await verifyMemberStage({ ...ctxFor(plan(), quiet), hubId: 'hub_1', profile: { ...ctx.profile, v3VerifyLoginEmail: '' } } as StageContext);
+    expect(quiet.calls).toEqual([]);
+  });
+});
+

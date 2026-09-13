@@ -24,7 +24,7 @@ import { playbackPrefilter, writePlaybackReport, type PlaybackResult } from './p
 import { APPLY_ORDER, shouldPublish } from './order.js';
 import {
   accessRulesStage, achievementsStage, assetReferences, attachFoldersStage, brandingStage, doneEntriesDiffering, foldersStage, hubStage, legacySegmentsGating,
-  navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, removalsStage, segmentsStage, tagsStage, spacesStage,
+  navigationStage, pageDraftsStage, pageTreesStage, playlistsStage, removalsStage, segmentsStage, tagsStage, spacesStage, verifyMemberStage,
   type StageContext,
 } from './stages.js';
 import type { LedgerHeader } from '../ledger/schema.js';
@@ -269,6 +269,9 @@ export async function runApply(options: ApplyOptions): Promise<string> {
           break;
         case 'branding':
           await brandingStage(ctx);
+          break;
+        case 'verifyMember':
+          await verifyMemberStage(ctx);
           break;
         case 'tags':
           await tagsStage(ctx);

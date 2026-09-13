@@ -1,3 +1,4 @@
+import { StaleRevisionError } from './api.js';
 import type { Profile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { recordMarker } from '../ledger/marker.js';
@@ -208,6 +209,46 @@ export async function hubStage(ctx: StageContext): Promise<string> {
   });
   ctx.store.setTargetHubId(id);
   return id;
+}
+
+// ---------------------------------------------------------------- verify member
+
+/**
+ * The profile's V3 verify login becomes a member of the hub, so verify can log
+ * in as soon as the hub exists. The contact must already exist globally with a
+ * password (contact passwords are set by the contact, never by an admin); this
+ * stage only makes sure the team has it and the hub counts it as active.
+ * Idempotent: an existing membership answers 409 and is treated as done.
+ */
+export async function verifyMemberStage(ctx: StageContext): Promise<void> {
+  const email = ctx.profile.v3VerifyLoginEmail.trim();
+  if (!email) {
+    logger.info('verify member skipped: the profile has no v3VerifyLoginEmail');
+    return;
+  }
+  const contacts = `/api/teams/${ctx.profile.teamId}/contacts`;
+  type TeamContact = { id: string; attributes: { contact_id: string; email: string } };
+  const list = await ctx.api.get<{ data?: TeamContact[] }>(`${contacts}?filter[email]=${encodeURIComponent(email)}`);
+  let contactId = (list.body?.data ?? []).find((c) => c.attributes.email.toLowerCase() === email.toLowerCase())?.attributes.contact_id ?? null;
+  if (!contactId) {
+    const created = await ctx.api.post<{ data: TeamContact }>(contacts, { data: { type: 'team_contacts', attributes: { email } } });
+    contactId = created.data.attributes.contact_id;
+    logger.info('verify member contact created on the team', { email });
+  }
+  try {
+    await ctx.api.post(
+      `/api/admin/teams/${ctx.profile.teamId}/hubs/${ctx.hubId}/members`,
+      { data: { type: 'hub_memberships', attributes: { contact_id: contactId } } },
+    );
+    logger.info('verify member added to the hub', { email });
+  } catch (error) {
+    // 409 surfaces as StaleRevisionError from the client; here it means "already a member".
+    if (error instanceof StaleRevisionError || /returned 409/.test(error instanceof Error ? error.message : '')) {
+      logger.info('verify member already on the hub', { email });
+      return;
+    }
+    throw error;
+  }
 }
 
 // ---------------------------------------------------------------- branding
