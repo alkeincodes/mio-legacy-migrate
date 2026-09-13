@@ -21,7 +21,7 @@ function store(): LedgerStore {
 function report(overrides: Partial<StructuralReport> = {}): StructuralReport {
   return {
     runId: 'run-1',
-    pages: [{ slug: 'about', legacySectionCount: 1, catalogSectionCount: 1, nodeCount: 3, warningsByType: {}, targetSectionCount: 1, drift: 'match' }],
+    pages: [{ slug: 'about', pageType: 'generic', legacySectionCount: 1, catalogSectionCount: 1, nodeCount: 3, warningsByType: {}, targetSectionCount: 1, drift: 'match' }],
     counts: { planPages: 1, targetPages: 1, planPlaylists: 0, targetPlaylists: 0, planFolders: 0, targetFolders: 0, planAssets: 0, targetFiles: 0 },
     warningsByType: {}, driftedPages: [],
     ...overrides,
@@ -63,6 +63,15 @@ describe('evaluateAcceptance', () => {
     });
     expect(verdict.accepted).toBe(false);
     expect(verdict.failures.join(' ')).toContain('about');
+  });
+
+  it('does not fail on the content page, which V3 renders itself, but notes it for sign-off', () => {
+    const verdict = evaluateAcceptance({
+      ...clean,
+      report: report({ pages: [{ ...report().pages[0]!, slug: 'content', pageType: 'content', targetSectionCount: 0 }] }),
+    });
+    expect(verdict.accepted).toBe(true);
+    expect(verdict.forSignoff.join(' ')).toContain("V3's content page");
   });
 
   it('rejects any dropped warning', () => {

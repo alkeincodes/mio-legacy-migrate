@@ -8,6 +8,8 @@ const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
 export interface PageReportRow {
   slug: string;
+  /** The plan's page type; V3 renders the `content` page itself, so its section count is not comparable. */
+  pageType: string;
   legacySectionCount: number;
   catalogSectionCount: number;
   nodeCount: number;
@@ -74,6 +76,7 @@ export function buildStructuralReport(opts: {
 
     pages.push({
       slug: page.slug,
+      pageType: page.pageType,
       legacySectionCount: page.tree.children?.length ?? 0,
       catalogSectionCount: (page.tree.children ?? []).filter((c) => c.template !== undefined).length,
       nodeCount: countNodes(page.tree),
