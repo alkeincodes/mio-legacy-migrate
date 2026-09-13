@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { loadEnv, withProfileLogins, secretsOf } from '../config/env.js';
+import { loadEnv, requireHubLogins, withProfileLogins, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from '../apply/auth.js';
 import { assetReferences } from '../apply/stages.js';
 import { loadProfile, targetOf } from '../config/profile.js';
@@ -25,6 +25,7 @@ export async function runVerify(opts: {
   const envBase = loadEnv('.env', { require: ['cdn', 'logins'] });
   const profile = loadProfile(opts.profileName, targetOf(envBase));
   const env = withProfileLogins(envBase, profile);
+  requireHubLogins(env, profile.name);
   logger.setSecrets(secretsOf(env));
   const auth = await resolveApiAuth(profile, env);
   const apiKey = auth.token;

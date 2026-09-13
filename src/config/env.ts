@@ -177,13 +177,9 @@ export function loadEnv(
   };
 }
 
-/**
- * The logins a run uses come from the profile. Each legacy hub has its own
- * audience account and each V3 hub its own member, so a blank one is refused
- * rather than silently verifying the wrong hub.
- */
+/** The logins a run uses come from the profile; loadEnv leaves them empty. */
 export function withProfileLogins(env: Env, profile: ProfileFile): Env {
-  const out: Env = {
+  return {
     ...env,
     legacyHubLoginEmail: profile.legacyHubLoginEmail,
     legacyHubLoginPassword: profile.legacyHubLoginPassword,
@@ -192,11 +188,19 @@ export function withProfileLogins(env: Env, profile: ProfileFile): Env {
     v3PlatformLoginEmail: profile.v3PlatformLoginEmail,
     v3PlatformLoginPassword: profile.v3PlatformLoginPassword,
   };
+}
+
+/**
+ * verify logs into both sites, so it needs both hub members. Each legacy hub
+ * has its own audience account and each V3 hub its own member; a blank one is
+ * refused rather than silently verifying the wrong hub. apply does not need
+ * them (its API identity is the platform login or V3_API_KEY_<PROFILE>).
+ */
+export function requireHubLogins(env: Env, profileName: string): void {
   const missing: string[] = [];
-  if (!out.legacyHubLoginEmail || !out.legacyHubLoginPassword) missing.push('legacyHubLoginEmail/legacyHubLoginPassword');
-  if (!out.v3VerifyLoginEmail || !out.v3VerifyLoginPassword) missing.push('v3VerifyLoginEmail/v3VerifyLoginPassword');
-  if (missing.length > 0) throw new Error(`profile "${profile.name}" has a blank login: ${missing.join('; ')}. Fill it in profiles/${profile.name}.json`);
-  return out;
+  if (!env.legacyHubLoginEmail || !env.legacyHubLoginPassword) missing.push('legacyHubLoginEmail/legacyHubLoginPassword');
+  if (!env.v3VerifyLoginEmail || !env.v3VerifyLoginPassword) missing.push('v3VerifyLoginEmail/v3VerifyLoginPassword');
+  if (missing.length > 0) throw new Error(`profile "${profileName}" has a blank login: ${missing.join('; ')}. Fill it in profiles/${profileName}.json`);
 }
 
 export function apiKeyVarName(profileName: string): string {

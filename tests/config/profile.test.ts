@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initProfile, loadProfile, profileSecrets, targetOf, type ProfileFile, type Target } from '../../src/config/profile.js';
-import { withProfileLogins, type Env } from '../../src/config/env.js';
+import { requireHubLogins, withProfileLogins, type Env } from '../../src/config/env.js';
 
 const TARGET: Target = { apiBase: 'https://api.member.dev', bucket: 'b', region: 'us-east-1', cdnBase: 'https://cdn.example', cdnBaseConfirmed: false, hubBase: 'https://hub.member.dev' };
 const BLANK = { legacyHubLoginEmail: '', legacyHubLoginPassword: '', v3VerifyLoginEmail: '', v3VerifyLoginPassword: '', v3PlatformLoginEmail: '', v3PlatformLoginPassword: '' };
@@ -60,8 +60,10 @@ describe('withProfileLogins', () => {
     expect(out).toMatchObject({ legacyHubLoginEmail: 'a@x', legacyHubLoginPassword: 'pa', v3VerifyLoginEmail: 'b@x', v3VerifyLoginPassword: 'pb', v3PlatformLoginEmail: '' });
   });
 
-  it('refuses a blank hub login and names the profile file to fill in', () => {
-    expect(() => withProfileLogins(env, profile({ legacyHubLoginEmail: 'a@x', legacyHubLoginPassword: 'pa' }))).toThrow(/v3VerifyLoginEmail.*profiles\/p\.json/);
+  it('copies blanks through for apply; verify refuses a blank hub login and names the profile file', () => {
+    const out = withProfileLogins(env, profile({ legacyHubLoginEmail: 'a@x', legacyHubLoginPassword: 'pa' }));
+    expect(out.v3VerifyLoginEmail).toBe('');
+    expect(() => requireHubLogins(out, 'p')).toThrow(/v3VerifyLoginEmail.*profiles\/p\.json/);
   });
 
   it('targetOf lifts the shared V3 values out of the env', () => {
