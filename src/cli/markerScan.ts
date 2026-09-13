@@ -3,7 +3,7 @@ import { Budget, budgetIdentity } from '../apply/budget.js';
 import type { ListByMarker } from '../apply/inflight.js';
 import { loadEnv, withProfileLogins, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from '../apply/auth.js';
-import { loadProfile } from '../config/profile.js';
+import { loadProfile, targetOf } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { parseMarker } from '../ledger/marker.js';
 import type { LedgerStore } from '../ledger/store.js';
@@ -15,8 +15,9 @@ import type { LedgerStore } from '../ledger/store.js';
  */
 export function markerScanner(store: LedgerStore, profileName: string): ListByMarker {
   return async (marker) => {
-    const profile = loadProfile(profileName);
-    const env = withProfileLogins(loadEnv('.env', { require: ['logins'] }), profile);
+    const envBase = loadEnv('.env', { require: ['logins'] });
+    const profile = loadProfile(profileName, targetOf(envBase));
+    const env = withProfileLogins(envBase, profile);
     logger.setSecrets(secretsOf(env));
     const auth = await resolveApiAuth(profile, env);
     const apiKey = auth.token;

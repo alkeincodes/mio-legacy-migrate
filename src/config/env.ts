@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { parse as parseDotenv } from 'dotenv';
 import { z } from 'zod';
-import type { Profile } from './profile.js';
+import type { ProfileFile } from './profile.js';
 
 const EnvSchema = z.object({
   LEGACY_DB_HOST: z.string().min(1),
@@ -20,13 +20,13 @@ const EnvSchema = z.object({
   LEGACY_S3_BUCKET: z.string().min(1),
   LEGACY_S3_URL: z.string().url(),
   LEGACY_CDN_URL: z.string().url(),
-  // Logins normally come from the profile; these are the fallback for a profile that sets none.
-  LEGACY_HUB_LOGIN_EMAIL: z.string().default(''),
-  LEGACY_HUB_LOGIN_PASSWORD: z.string().default(''),
-  V3_VERIFY_LOGIN_EMAIL: z.string().default(''),
-  V3_VERIFY_LOGIN_PASSWORD: z.string().default(''),
-  V3_PLATFORM_LOGIN_EMAIL: z.string().default(''),
-  V3_PLATFORM_LOGIN_PASSWORD: z.string().default(''),
+  // The V3 target every hub shares; the per-hub values (team, logins) live in profiles/<name>.json.
+  V3_API_BASE: z.string().url().default('https://api.member.dev'),
+  V3_ASSETS_BUCKET: z.string().min(1).default('mio-backend-assets-production'),
+  V3_ASSETS_REGION: z.string().min(1).default('us-east-1'),
+  V3_CDN_BASE: z.string().url().default('https://miocdn.membership.io'),
+  V3_CDN_BASE_CONFIRMED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  V3_HUB_BASE: z.string().url().default('https://hub.member.dev'),
 });
 
 export interface Env {
@@ -47,6 +47,13 @@ export interface Env {
   legacyS3Bucket: string;
   legacyS3Url: string;
   legacyCdnUrl: string;
+  v3ApiBase: string;
+  v3AssetsBucket: string;
+  v3AssetsRegion: string;
+  v3CdnBase: string;
+  v3CdnBaseConfirmed: boolean;
+  v3HubBase: string;
+  /** Filled from the profile by withProfileLogins; loadEnv leaves them empty. */
   legacyHubLoginEmail: string;
   legacyHubLoginPassword: string;
   v3VerifyLoginEmail: string;
@@ -70,12 +77,12 @@ const ALWAYS_KEYS = [
   'SSH_BOX_HOST', 'SSH_BOX_USER', 'SSH_KNOWN_HOSTS_FILE',
 ];
 const PLACEHOLDERS: Record<string, string> = {
-  LEGACY_HUB_LOGIN_EMAIL: '',
-  LEGACY_HUB_LOGIN_PASSWORD: '',
-  V3_VERIFY_LOGIN_EMAIL: '',
-  V3_VERIFY_LOGIN_PASSWORD: '',
-  V3_PLATFORM_LOGIN_EMAIL: '',
-  V3_PLATFORM_LOGIN_PASSWORD: '',
+  V3_API_BASE: 'https://api.member.dev',
+  V3_ASSETS_BUCKET: 'mio-backend-assets-production',
+  V3_ASSETS_REGION: 'us-east-1',
+  V3_CDN_BASE: 'https://miocdn.membership.io',
+  V3_CDN_BASE_CONFIRMED: 'false',
+  V3_HUB_BASE: 'https://hub.member.dev',
   V3_AWS_ACCESS_KEY_ID: '',
   V3_AWS_SECRET_ACCESS_KEY: '',
   AWS_REGION: 'us-east-1',
@@ -155,36 +162,40 @@ export function loadEnv(
     legacyS3Bucket: e.LEGACY_S3_BUCKET,
     legacyS3Url: e.LEGACY_S3_URL,
     legacyCdnUrl: e.LEGACY_CDN_URL,
-    legacyHubLoginEmail: e.LEGACY_HUB_LOGIN_EMAIL,
-    legacyHubLoginPassword: e.LEGACY_HUB_LOGIN_PASSWORD,
-    v3VerifyLoginEmail: e.V3_VERIFY_LOGIN_EMAIL,
-    v3VerifyLoginPassword: e.V3_VERIFY_LOGIN_PASSWORD,
-    v3PlatformLoginEmail: e.V3_PLATFORM_LOGIN_EMAIL,
-    v3PlatformLoginPassword: e.V3_PLATFORM_LOGIN_PASSWORD,
+    v3ApiBase: e.V3_API_BASE,
+    v3AssetsBucket: e.V3_ASSETS_BUCKET,
+    v3AssetsRegion: e.V3_ASSETS_REGION,
+    v3CdnBase: e.V3_CDN_BASE,
+    v3CdnBaseConfirmed: e.V3_CDN_BASE_CONFIRMED,
+    v3HubBase: e.V3_HUB_BASE,
+    legacyHubLoginEmail: '',
+    legacyHubLoginPassword: '',
+    v3VerifyLoginEmail: '',
+    v3VerifyLoginPassword: '',
+    v3PlatformLoginEmail: '',
+    v3PlatformLoginPassword: '',
   };
 }
 
 /**
- * The logins a run uses: the profile's own when it sets them, else the .env
- * fallback. Each legacy hub has its own audience account and each V3 hub its
- * own member, so a profile without them would silently verify the wrong hub;
- * both are required to resolve to something.
+ * The logins a run uses come from the profile. Each legacy hub has its own
+ * audience account and each V3 hub its own member, so a blank one is refused
+ * rather than silently verifying the wrong hub.
  */
-export function withProfileLogins(env: Env, profile: Pick<Profile, 'name' | 'legacyHubLoginEmail' | 'legacyHubLoginPassword' | 'v3VerifyLoginEmail' | 'v3VerifyLoginPassword' | 'v3PlatformLoginEmail' | 'v3PlatformLoginPassword'>): Env {
-  const pick = (own: string | undefined, fallback: string): string => (own && own.length > 0 ? own : fallback);
+export function withProfileLogins(env: Env, profile: ProfileFile): Env {
   const out: Env = {
     ...env,
-    legacyHubLoginEmail: pick(profile.legacyHubLoginEmail, env.legacyHubLoginEmail),
-    legacyHubLoginPassword: pick(profile.legacyHubLoginPassword, env.legacyHubLoginPassword),
-    v3VerifyLoginEmail: pick(profile.v3VerifyLoginEmail, env.v3VerifyLoginEmail),
-    v3VerifyLoginPassword: pick(profile.v3VerifyLoginPassword, env.v3VerifyLoginPassword),
-    v3PlatformLoginEmail: pick(profile.v3PlatformLoginEmail, env.v3PlatformLoginEmail),
-    v3PlatformLoginPassword: pick(profile.v3PlatformLoginPassword, env.v3PlatformLoginPassword),
+    legacyHubLoginEmail: profile.legacyHubLoginEmail,
+    legacyHubLoginPassword: profile.legacyHubLoginPassword,
+    v3VerifyLoginEmail: profile.v3VerifyLoginEmail,
+    v3VerifyLoginPassword: profile.v3VerifyLoginPassword,
+    v3PlatformLoginEmail: profile.v3PlatformLoginEmail,
+    v3PlatformLoginPassword: profile.v3PlatformLoginPassword,
   };
   const missing: string[] = [];
-  if (!out.legacyHubLoginEmail || !out.legacyHubLoginPassword) missing.push('legacyHubLoginEmail/legacyHubLoginPassword (or LEGACY_HUB_LOGIN_EMAIL/PASSWORD in .env)');
-  if (!out.v3VerifyLoginEmail || !out.v3VerifyLoginPassword) missing.push('v3VerifyLoginEmail/v3VerifyLoginPassword (or V3_VERIFY_LOGIN_EMAIL/PASSWORD in .env)');
-  if (missing.length > 0) throw new Error(`profile "${profile.name}" has no login for: ${missing.join('; ')}. Set them with profile init --legacy-login/--verify-login or edit profiles/${profile.name}.json`);
+  if (!out.legacyHubLoginEmail || !out.legacyHubLoginPassword) missing.push('legacyHubLoginEmail/legacyHubLoginPassword');
+  if (!out.v3VerifyLoginEmail || !out.v3VerifyLoginPassword) missing.push('v3VerifyLoginEmail/v3VerifyLoginPassword');
+  if (missing.length > 0) throw new Error(`profile "${profile.name}" has a blank login: ${missing.join('; ')}. Fill it in profiles/${profile.name}.json`);
   return out;
 }
 

@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { loadEnv, withProfileLogins, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from '../apply/auth.js';
 import { assetReferences } from '../apply/stages.js';
-import { loadProfile } from '../config/profile.js';
+import { loadProfile, targetOf } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { contentHash, readPlan } from '../map/plan.js';
 import { LedgerStore, ledgerDir } from '../ledger/store.js';
@@ -22,8 +22,9 @@ export async function runVerify(opts: {
   /** Capture the contact sheet; off by default until the assets have landed. */
   shots?: boolean;
 }): Promise<AcceptanceVerdict> {
-  const profile = loadProfile(opts.profileName);
-  const env = withProfileLogins(loadEnv('.env', { require: ['cdn', 'logins'] }), profile);
+  const envBase = loadEnv('.env', { require: ['cdn', 'logins'] });
+  const profile = loadProfile(opts.profileName, targetOf(envBase));
+  const env = withProfileLogins(envBase, profile);
   logger.setSecrets(secretsOf(env));
   const auth = await resolveApiAuth(profile, env);
   const apiKey = auth.token;

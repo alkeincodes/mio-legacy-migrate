@@ -120,7 +120,7 @@ const profileCmd = program.command('profile').description('target profiles');
 
 profileCmd
   .command('init')
-  .description('write profiles/<name>.json for a new target team with the production defaults')
+  .description('write profiles/<name>.json for a new hub: team id and its logins, blank where not given')
   .argument('<name>', 'profile name, e.g. acme-prod; also names the ledger directory')
   .requiredOption('--team-id <uuid>', 'the V3 team the hub is created in (mio teams list)')
   .option('--legacy-login <email:password>', 'an audience member of the legacy hub, for verify')

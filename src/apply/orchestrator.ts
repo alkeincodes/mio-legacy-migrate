@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadEnv, withProfileLogins, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from './auth.js';
-import { loadProfile } from '../config/profile.js';
+import { loadProfile, targetOf } from '../config/profile.js';
 import { logger } from '../log/logger.js';
 import { TOOL_VERSION } from '../version.js';
 import { readPlan, planHash, type Plan, type PlanAsset } from '../map/plan.js';
@@ -70,7 +70,8 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     throw new Error('--assets-only and --skip-assets contradict each other');
   }
 
-  const profile = loadProfile(options.profileName);
+  const envBase = loadEnv('.env', { require: ['s3', 'cdn', 'logins'] });
+  const profile = loadProfile(options.profileName, targetOf(envBase));
   const plan: Plan = readPlan(options.planPath);
   if (options.hubSlug) {
     if (!/^[a-z0-9][a-z0-9_-]*$/.test(options.hubSlug)) {
@@ -129,7 +130,7 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     );
   }
 
-  const env = withProfileLogins(loadEnv('.env', { require: ['s3', 'cdn', 'logins'] }), profile);
+  const env = withProfileLogins(envBase, profile);
   logger.setSecrets(secretsOf(env));
   const auth = await resolveApiAuth(profile, env);
   logger.setSecrets([...secretsOf(env), auth.token]);

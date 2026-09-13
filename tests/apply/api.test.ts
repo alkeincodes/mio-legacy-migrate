@@ -9,7 +9,7 @@ import type { Profile } from '../../src/config/profile.js';
 
 const profile: Profile = {
   name: 'test', apiBase: 'https://api.example.com', teamId: 'team-1',
-  bucket: 'b', region: 'us-east-1', cdnBase: 'https://cdn.example.com', cdnBaseConfirmed: true, hubBase: 'https://hub.example.com',
+  bucket: 'b', region: 'us-east-1', cdnBase: 'https://cdn.example.com', cdnBaseConfirmed: true, hubBase: 'https://hub.example.com', legacyHubLoginEmail: '', legacyHubLoginPassword: '', v3VerifyLoginEmail: '', v3VerifyLoginPassword: '', v3PlatformLoginEmail: '', v3PlatformLoginPassword: '',
 };
 
 function client(fetchImpl: typeof fetch): ApiClient {

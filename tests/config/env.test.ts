@@ -19,10 +19,8 @@ const COMPLETE = [
   'LEGACY_S3_BUCKET=legacy-bucket',
   'LEGACY_S3_URL=https://legacy-bucket.s3.amazonaws.com',
   'LEGACY_CDN_URL=https://cdn.legacy.example.com',
-  'LEGACY_HUB_LOGIN_EMAIL=a@example.com',
-  'LEGACY_HUB_LOGIN_PASSWORD=pw1',
-  'V3_VERIFY_LOGIN_EMAIL=b@example.com',
-  'V3_VERIFY_LOGIN_PASSWORD=pw2',
+  'V3_ASSETS_BUCKET=mio-backend-assets-production',
+  'V3_CDN_BASE=https://miocdn.membership.io',
 ].join('\n');
 
 function writeEnv(body: string): string {
@@ -71,11 +69,11 @@ describe('loadEnv with require groups', () => {
 
 describe('optional keys outside every group', () => {
   it('carries an optional value present in the file even when its group is not required', () => {
-    const path = writeEnv(`${COMPLETE}\nV3_PLATFORM_LOGIN_EMAIL=admin@example.com\nV3_AWS_ACCESS_KEY_ID=AKIA_V3`);
+    const path = writeEnv(`${COMPLETE}\nV3_CDN_BASE_CONFIRMED=true\nV3_AWS_ACCESS_KEY_ID=AKIA_V3`);
     const env = loadEnv(path, { require: ['cdn'] });
-    expect(env.v3PlatformLoginEmail).toBe('admin@example.com');
+    expect(env.v3CdnBaseConfirmed).toBe(true);
     expect(env.v3AwsAccessKeyId).toBe('AKIA_V3');
-    expect(loadEnv(path, { require: ['cdn', 'logins'] }).v3VerifyLoginEmail).toBe('b@example.com');
+    expect(loadEnv(path, { require: ['cdn', 'logins'] }).v3ApiBase).toBe('https://api.member.dev');
   });
 });
 

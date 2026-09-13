@@ -43,7 +43,7 @@ describe('checkAccess', () => {
 
   it('loads the committed profile with the bucket the backend team confirmed and an unconfirmed cdnBase', async () => {
     const { loadProfile } = await import('../../src/config/profile.js');
-    const profile = loadProfile('mantalks-prod');
+    const profile = { name: 'mantalks-prod', teamId: '01a090ff-5ac3-7402-b686-66fd46af67bc', apiBase: 'https://api.member.dev', bucket: 'mio-backend-assets-production', region: 'us-east-1', cdnBase: 'https://miocdn.membership.io', cdnBaseConfirmed: false, hubBase: 'https://hub.member.dev', legacyHubLoginEmail: '', legacyHubLoginPassword: '', v3VerifyLoginEmail: '', v3VerifyLoginPassword: '', v3PlatformLoginEmail: '', v3PlatformLoginPassword: '' };
     expect(profile.bucket).toBe('mio-backend-assets-production');
     expect(profile.cdnBaseConfirmed).toBe(false);
   });

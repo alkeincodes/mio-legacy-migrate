@@ -5,7 +5,7 @@ import type { Profile } from '../../src/config/profile.js';
 const profile: Profile = {
   name: 'mantalks-prod', apiBase: 'https://api.member.dev',
   teamId: '01a090ff-5ac3-7402-b686-66fd46af67bc', bucket: 'b',
-  region: 'us-east-1', cdnBase: 'https://cdn.example.com', cdnBaseConfirmed: true, hubBase: 'https://hub.example.com',
+  region: 'us-east-1', cdnBase: 'https://cdn.example.com', cdnBaseConfirmed: true, hubBase: 'https://hub.example.com', legacyHubLoginEmail: '', legacyHubLoginPassword: '', v3VerifyLoginEmail: '', v3VerifyLoginPassword: '', v3PlatformLoginEmail: '', v3PlatformLoginPassword: '',
 };
 
 function cliWith(whoami: Record<string, unknown>) {

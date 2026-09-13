@@ -23,21 +23,23 @@ token, so no static key has to be minted for a one-off run.
 
 ## A profile per hub
 
-Every production hub shares the API base, bucket, region, CDN and hub host;
-a profile names the V3 team the hub is created in and carries that hub's
-logins: an audience member of the legacy hub and a member of the V3 hub
-(verify logs into both sites with them), and optionally a platform user for
-the API when no `V3_API_KEY_<PROFILE>` is set. `mio teams list` (logged in
-as that team's account) prints the team id.
+`.env` holds what every hub shares: the legacy replica and box, the AWS pairs,
+and the V3 target (`V3_API_BASE`, `V3_ASSETS_BUCKET`, `V3_ASSETS_REGION`,
+`V3_CDN_BASE`, `V3_CDN_BASE_CONFIRMED`, `V3_HUB_BASE`). A profile holds what
+differs per hub: the V3 team the hub is created in and that hub's logins, an
+audience member of the legacy hub and a member of the V3 hub (verify logs
+into both sites with them), plus optionally a platform user for the API when
+no `V3_API_KEY_<PROFILE>` is set. `mio teams list` (logged in as that team's
+account) prints the team id.
 
     npx tsx src/cli/index.ts profile init <customer>-prod --team-id <team uuid> \
       --legacy-login member@customer.com:pw --verify-login member@customer.com:pw \
       --platform-login owner@customer.com:pw
 
-The profile name is what `--profile` takes and what names the ledger
-directory, so pick it once. `profiles/*.json` is gitignored: profiles hold
-credentials. The `LEGACY_HUB_LOGIN_*` and `V3_VERIFY_LOGIN_*` values in
-`.env` are only the fallback for a profile that sets none.
+Every login flag is optional; a field not given is written blank so the
+migrator can fill it in by hand before `verify`. The profile name is what
+`--profile` takes and what names the ledger directory, so pick it once.
+`profiles/*.json` is gitignored: profiles hold credentials.
 
 ## The four stages
 
