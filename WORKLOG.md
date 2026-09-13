@@ -457,3 +457,34 @@ colours are carried faithfully; V3's login layout assigns the token a
 different role. Recorded (README, radar row 26); a login-type page with a
 brand-panel slot would be the way to author it, not done.
 
+## 2026-09-13 (test2 review): six fixes from the first non-ManTalks hub
+
+User review of hub.member.dev/test2 found four gaps; two more surfaced while
+probing. All fixed, applied by `migrate` resume, verify accepted.
+1. Header: a legacy playlist menu item was dropped ("no resolvable link").
+   V3 navigation has page, url and discussions items only; a playlist item
+   is now a url item with a `playlistRef` the apply resolves to
+   `/<hubSlug>/playlists/<v3 id>`.
+2. Featured band CTA: apply had rewritten a playlist button action to
+   `page /content?playlist=<id>`; it is now V3's typed `playlist` action
+   (mio-hub action.ts builds /<hub>/playlists/<id>). The button was also not
+   white: legacy's `primary-color` band was emitted as a custom hex, so V3
+   never stamped data-bg="primary" and the primary button did not invert.
+   When V3's primary IS the legacy primary the band is the `primary` token.
+3. Scroll sections bound to a playlist (settings.type "playlist", the
+   default, model_type Playlist, no blocks: Scroll/Inner.vue renders
+   playlist-head + the files) were emitted empty since the tile change on
+   2026-09-12. They take the catalog compact-playlist recipe (the "Playlist
+   (bound header)" variant); grid/content-grid/carousel the grid-playlist
+   one. Tiles only when blocks exist. ManTalks has 36 such sections, all
+   empty on the live Alliance hub until it is resumed.
+4. A paragraph whose settings.value is a plain string (older rows) was
+   dropped in favour of the display label; the string is the paragraph now.
+5. The bound header rendered the playlist description, which held the
+   `lgc:` adoption marker. Playlists now carry the marker in meta.lgcMarker
+   and the legacy description in description; existing rows are repaired on
+   resume (the scanner reads both places). Playlist PATCH needs data.id.
+6. url navigation hrefs must carry the hub slug (route-resolver.ts:90); apply
+   scopes every internal href with the hub's slug read from the API.
+551 tests.
+
