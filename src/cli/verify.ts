@@ -72,7 +72,16 @@ export async function runVerify(opts: {
   });
 
   const runDir = `runs/${opts.runId}`;
-  const v3Origin = `${profile.hubBase.replace(/\/$/, '')}/${plan.hub.slug}`;
+  // The hub lives at the slug it was created with (--hub-slug, or the plan's,
+  // auto-suffixed by V3 if taken), which the plan cannot know; ask the hub itself.
+  let hubSlug = plan.hub.slug;
+  try {
+    const { body } = await api.get<{ data: { attributes: { slug?: string } } }>(`/api/v1/teams/${profile.teamId}/hubs/${hubId}`);
+    if (body.data.attributes.slug) hubSlug = body.data.attributes.slug;
+  } catch (error) {
+    logger.warn('could not read the hub slug from the API; using the plan slug', { error: error instanceof Error ? error.message.slice(0, 120) : String(error) });
+  }
+  const v3Origin = `${profile.hubBase.replace(/\/$/, '')}/${hubSlug}`;
   if (!plan.legacyHubDomain) throw new Error('the plan carries no legacyHubDomain; re-run map');
   const legacyOrigin = `https://${plan.legacyHubDomain}`;
 
