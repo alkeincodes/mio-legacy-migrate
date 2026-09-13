@@ -7,6 +7,7 @@ import {
   fetchReplicaLagSeconds,
   fetchSections,
   findHubByDomain,
+  findHubByHost,
   MORPH_FILE,
   MORPH_HUB,
   MORPH_PLAYLIST,
@@ -40,6 +41,26 @@ describe('findHubByDomain', () => {
 
   it('returns null rather than throwing when the domain is unknown', async () => {
     expect(await findHubByDomain(recorder([[]]), 'nope.example.com')).toBeNull();
+  });
+});
+
+describe('findHubByHost', () => {
+  it('looks a default hub-<hash> host up by its decoded id', async () => {
+    const session = recorder([[{ id: 12607, title: 'Web Developments' }]]);
+    const hub = await findHubByHost(session, 'hub-edxg119xn8.membership.io');
+    expect(hub?.id).toBe(12607);
+    const [sql, params] = session.calls[0]!;
+    expect(sql).toMatch(/WHERE id = \?/);
+    expect(params).toEqual([12607]);
+  });
+
+  it('matches any other host on the custom domain or the custom subdomain', async () => {
+    const session = recorder([[{ id: 7 }]]);
+    await findHubByHost(session, 'alliance.mantalks.com');
+    const [sql, params] = session.calls[0]!;
+    expect(sql).toMatch(/domain = \?/);
+    expect(sql).toMatch(/custom_subdomain = \?/);
+    expect(params).toEqual(['alliance.mantalks.com', 'alliance', 'alliance.mantalks.com']);
   });
 });
 

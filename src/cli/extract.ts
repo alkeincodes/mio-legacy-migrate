@@ -9,11 +9,12 @@ import {
   distinctSectionTypes, fetchAchievements, fetchDiscussionCategories, fetchFiles,
   fetchFolders, fetchHubFiles, fetchHubTheme, fetchMedia, fetchMenuItems, fetchPages,
   fetchPlaylistItems, fetchPlaylists, fetchReplicaLagSeconds, fetchSections,
-  fetchSegmentables, fetchSegments, findHubByDomain, MORPH_FILE, MORPH_HUB, MORPH_PAGE,
+  fetchSegmentables, fetchSegments, findHubByHost, MORPH_FILE, MORPH_HUB, MORPH_PAGE,
   MORPH_PLAYLIST, MORPH_SECTION,
 } from '../extract/queries.js';
 import { buildManifest, pinManifest, unpinnedHeadFor, type HeadObjectFn, type HeadResult, type LegacyGate } from '../extract/manifest.js';
 import { readBundle, writeBundle, type Bundle } from '../extract/bundle.js';
+import { normaliseHubHost } from '../extract/hubHost.js';
 import type { Env } from '../config/env.js';
 
 export interface ExtractOptions {
@@ -83,8 +84,13 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
     const captureStartedAt = new Date().toISOString();
     const replicaLagSeconds = await fetchReplicaLagSeconds(session);
 
-    const hub = await findHubByDomain(session, options.domain);
-    if (!hub) throw new Error(`no hub with domain "${options.domain}" on the replica`);
+    const host = normaliseHubHost(options.domain);
+    const hub = await findHubByHost(session, host);
+    if (!hub) {
+      throw new Error(
+        `no hub answers at "${host}" on the replica. Pass the address the hub is served at: its custom domain (alliance.mantalks.com), its custom subdomain (<name>.membership.io) or its default host (hub-<hash>.membership.io)`,
+      );
+    }
 
     if (options.checkAccess) {
       logger.info('extract --check-access: replica reachable and the hub resolves', {
@@ -176,7 +182,7 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
         bundleSchemaVersion: 1,
         toolVersion: TOOL_VERSION,
         legacyHubId: hub.id,
-        legacyHubDomain: options.domain,
+        legacyHubDomain: host,
         sourceHost: env.legacyDbHost,
         captureStartedAt,
         captureEndedAt: new Date().toISOString(),

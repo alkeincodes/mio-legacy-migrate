@@ -3,8 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24.15.0" },
-  "bin": { "mio-legacy-migrate": "./dist/cli/index.js" },
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "bin": {
+    "mio-legacy-migrate": "./dist/cli/index.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -15,6 +19,7 @@
     "@aws-sdk/client-s3": "^3.700.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",
+    "hashids": "^2.3.0",
     "mysql2": "^3.11.5",
     "playwright": "^1.49.0",
     "zod": "^3.23.8"

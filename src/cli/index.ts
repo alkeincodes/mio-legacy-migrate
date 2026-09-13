@@ -20,7 +20,7 @@ program.name('mio-legacy-migrate').version(TOOL_VERSION);
 program
   .command('extract')
   .description('capture one legacy hub from the read replica into a bundle')
-  .argument('[domain]', 'the legacy hub domain, for example alliance.mantalks.com (not needed with --s3-only)')
+  .argument('[domain]', 'the legacy hub address: a URL or host, custom domain (alliance.mantalks.com) or default host (hub-<hash>.membership.io); not needed with --s3-only')
   .option('--out <dir>', 'bundle output directory', 'bundles')
   .option('--check-access', 'prove the replica credentials and exit without capturing', false)
   .option('--skip-s3', 'capture without AWS values; the manifest stays unpinned until --s3-only', false)

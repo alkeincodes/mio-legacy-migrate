@@ -1,3 +1,4 @@
+import { hubIdFromHost } from './hubHost.js';
 import { paginateByPk, type SnapshotSession } from './db.js';
 
 /**
@@ -78,17 +79,47 @@ export interface LegacySegmentCondition {
 }
 export interface LegacySegmentable { id: number; segment_id: number; segmentable_id: number; segmentable_type: string }
 
+const HUB_COLUMNS = `id, team_id, user_id, current_theme_id, title, description, meta,
+            domain, custom_subdomain, auth, contact_email`;
+
 export async function findHubByDomain(
   session: SnapshotSession,
   domain: string,
 ): Promise<LegacyHub | null> {
   const rows = await session.query<LegacyHub>(
-    `SELECT id, team_id, user_id, current_theme_id, title, description, meta,
-            domain, custom_subdomain, auth, contact_email
+    `SELECT ${HUB_COLUMNS}
        FROM hubs
       WHERE domain = ? AND deleted_at IS NULL
       LIMIT 1`,
     [domain],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * A hub by any host it answers at: the decoded id for a default
+ * `hub-<hash>.membership.io` host, else the custom domain, else the custom
+ * subdomain (the host's first label) on membership.io.
+ */
+export async function findHubByHost(
+  session: SnapshotSession,
+  host: string,
+): Promise<LegacyHub | null> {
+  const id = hubIdFromHost(host);
+  if (id !== null) {
+    const rows = await session.query<LegacyHub>(
+      `SELECT ${HUB_COLUMNS} FROM hubs WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
+      [id],
+    );
+    return rows[0] ?? null;
+  }
+  const label = host.split('.')[0] ?? host;
+  const rows = await session.query<LegacyHub>(
+    `SELECT ${HUB_COLUMNS}
+       FROM hubs
+      WHERE (domain = ? OR (custom_subdomain = ? AND ? LIKE '%.membership.io')) AND deleted_at IS NULL
+      LIMIT 1`,
+    [host, label, host],
   );
   return rows[0] ?? null;
 }
