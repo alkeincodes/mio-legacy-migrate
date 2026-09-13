@@ -41,6 +41,42 @@ migrator can fill it in by hand before `verify`. The profile name is what
 `--profile` takes and what names the ledger directory, so pick it once.
 `profiles/*.json` is gitignored: profiles hold credentials.
 
+## One command: migrate
+
+After `profile init` and filling the profile, one command runs the whole
+thing: extract with the S3 identities pinned, map, apply and verify.
+
+    npx tsx src/cli/index.ts migrate <legacy address> --profile <name> --hub-slug <slug>
+
+`<legacy address>` is the hub's URL or host as the migrator sees it: a custom
+domain (`alliance.mantalks.com`) or the default `hub-<hash>.membership.io`.
+Add `--dry-run` to stop after the apply dry run. A rerun of the same command
+resumes the run the ledger holds for that profile and legacy hub (the plan
+changes are accepted and changed page trees rewritten), so a second hub can
+never be created by accident; the ledger is committed to git around each run.
+Verify runs only when both hub logins in the profile are filled; the V3
+member cannot exist before the first apply creates the hub, so a first run
+always skips it and says so.
+
+Two flags every migrator must understand:
+
+- `--hub-slug <slug>` names the V3 hub's URL, `<hubBase>/<slug>`. It is a free
+  choice, not tied to anything legacy. Slugs are global across every V3 team
+  and a taken slug is silently auto-suffixed (asking for `alliance` twice
+  yields `alliance-xxxx`), so read the hub URL the run prints. The slug is
+  fixed at creation; a resume cannot change it. Required on the first run.
+- `--publish-held` concerns pages legacy gated by a segment the migration
+  could not rebuild on V3 (attribute segments such as "No Profile Details"
+  are not extracted). Without the flag those pages are created as held drafts
+  so nothing leaks, and the report lists them. With it they are published
+  ungated, visible to every hub member, and the report marks them
+  `published-ungated` so the team can re-gate them by hand. We used it on
+  ManTalks because its home page was in that set.
+
+`--assets` copies media into the V3 bucket and needs `V3_AWS_*` in `.env`;
+without it images stay legacy-linked and media pending, which is the state
+until those keys exist.
+
 ## The four stages
 
     npx tsx src/cli/index.ts extract alliance.mantalks.com

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { initProfile } from '../config/profile.js';
+import { runMigrate } from './migrate.js';
 import { Command } from 'commander';
 import { TOOL_VERSION } from '../version.js';
 import { runExtract, runPinBundle } from './extract.js';
@@ -114,6 +115,19 @@ program
   .requiredOption('--profile <name>', 'target profile name')
   .action((opts: { profile: string }) => {
     process.stdout.write(`${renderInventory(buildInventory(opts.profile))}\n`);
+  });
+
+program
+  .command('migrate')
+  .description('after profile init: extract (pinned), map, apply and verify in one go; a rerun resumes the hub the ledger already holds')
+  .argument('<address>', 'the legacy hub address: a URL or host, custom domain (alliance.mantalks.com) or default host (hub-<hash>.membership.io)')
+  .requiredOption('--profile <name>', 'target profile name (profiles/<name>.json)')
+  .option('--hub-slug <slug>', 'the V3 hub slug on the first run; the hub lives at <hubBase>/<slug>, global, auto-suffixed if taken, fixed afterwards')
+  .option('--dry-run', 'extract, map and the apply dry run, then stop', false)
+  .option('--publish-held', 'publish pages whose legacy segment gate could not be rebuilt; without it they are held as drafts and listed', false)
+  .option('--assets', 'copy media into the V3 bucket (needs V3_AWS_*); off: images legacy-linked, media pending', false)
+  .action(async (address: string, opts: { profile: string; hubSlug?: string; dryRun: boolean; publishHeld: boolean; assets: boolean }) => {
+    await runMigrate({ address, profileName: opts.profile, hubSlug: opts.hubSlug ?? null, dryRun: opts.dryRun, publishHeld: opts.publishHeld, assets: opts.assets });
   });
 
 const profileCmd = program.command('profile').description('target profiles');

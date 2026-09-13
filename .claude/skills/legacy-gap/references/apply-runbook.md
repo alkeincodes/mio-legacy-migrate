@@ -14,6 +14,14 @@ tail -1 /tmp/apply.log                                                  # must s
 git add ledger && git commit -m "ledger: after <what>"
 ```
 
+Or, for any hub set up with `profile init`, the one command that does map and apply (and extract, verify) with the resume worked out from the ledger:
+
+```bash
+npm run cli -- migrate <legacy address> --profile <name>        # resumes; --hub-slug only on a first run
+```
+
+`--hub-slug` is a free choice, global, auto-suffixed if taken, fixed at creation. `--publish-held` publishes pages whose legacy segment gate could not be rebuilt (held drafts otherwise). Both are documented in README "One command: migrate".
+
 Facts that bite:
 
 - The clean-ledger gate refuses to start when `ledger/` has uncommitted changes. Commit after every apply, stopped or not.
