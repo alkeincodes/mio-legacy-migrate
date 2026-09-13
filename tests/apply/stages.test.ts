@@ -96,7 +96,9 @@ describe('hubStage', () => {
     const attrs = (create.body as { data: { attributes: Record<string, unknown> } }).data.attributes;
     expect(attrs['meta']).toEqual({ lgcMarker: marker(7) });
     expect(attrs['settings']).toEqual({ registration: { enabled: false } });
-    expect(attrs['is_private']).toBe(true);
+    // V3 private = team-only and unreachable to members; a legacy members hub is reachable with registration closed.
+    expect(attrs['is_private']).toBe(false);
+    expect(attrs['settings']).toEqual({ registration: { enabled: false } });
     expect(ctx.store.header.targetHubId).toBe('hub_new');
     expect(ctx.store.find(marker(7))?.state).toBe('done');
   });

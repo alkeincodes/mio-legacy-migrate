@@ -118,6 +118,18 @@ Unpublishing or deleting migrated records is a human decision made with the mio
 CLI. The ledger fields you need are `v3Id` (the target id), `kind` (which entity
 type), and `marker` (which run created it).
 
+## Hub privacy: legacy `auth` is not V3 `is_private`
+
+A legacy hub with `auth = 1` requires members to log in. V3's `is_private`
+means something narrower: only members of the owning TEAM can reach the hub
+at all, and the public slug lookup answers 404 to everyone else, so even the
+login page is unreachable (mio-backend `app/hubs/models.py:24-25`,
+`app/hubs/service.py:1314-1360`). The migration therefore creates every hub
+with `is_private: false` and `settings.registration.enabled: false`: reachable,
+log in required, nobody can self-register. `apply` re-states `is_private:
+false` on every run, so a hub flipped to team-only by hand comes back. If a
+customer wants a team-only hub, that is a V3 admin decision after migration.
+
 ## What M1 does not do
 
 - Video does not appear in the media library or in course playlists. It plays on

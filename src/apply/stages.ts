@@ -181,7 +181,11 @@ export async function hubStage(ctx: StageContext): Promise<string> {
               title: ctx.plan.hub.title,
               slug: ctx.plan.hub.slug,
               description: ctx.plan.hub.description,
-              is_private: true,
+              // V3 is_private means TEAM MEMBERS ONLY (mio-backend app/hubs/models.py:24-25):
+              // the slug lookup answers 404 to everyone else, members included, so the
+              // login page itself is unreachable. A legacy members hub (auth=1) is the
+              // V3 default instead: reachable, log in required, registration closed.
+              is_private: false,
               // Fail-closed by default in app/hubs/registration.py; stated anyway.
               settings: { registration: { enabled: false } },
               meta: { lgcMarker: marker },
@@ -211,11 +215,11 @@ export async function hubStage(ctx: StageContext): Promise<string> {
 export async function brandingStage(ctx: StageContext): Promise<void> {
   const keys = Object.keys(ctx.plan.branding);
   const settingsKeys = Object.keys(ctx.plan.hubSettings ?? {});
-  if (keys.length === 0 && settingsKeys.length === 0) return;
   const hub = await ctx.api.get<{ data?: { attributes?: { settings?: Record<string, unknown> } } }>(`${team(ctx)}/hubs/${ctx.hubId}`);
   // The hub PATCH replaces the settings blob, so merge over what is there (registration stays as apply set it).
   const current = hub.body?.data?.attributes?.settings ?? {};
-  const attributes: Record<string, unknown> = {};
+  // Re-stated on every run so a hub flipped to team-only by hand comes back reachable.
+  const attributes: Record<string, unknown> = { is_private: false };
   if (keys.length > 0) attributes['branding'] = ctx.plan.branding;
   if (settingsKeys.length > 0) attributes['settings'] = { ...current, ...ctx.plan.hubSettings };
   await ctx.api.patch(
