@@ -440,3 +440,20 @@ ca4c3373, plan hub-12607-dfd2be02a140). Three things it exposed, all fixed:
    of failing. test2 verify: accepted, authz skipped (no test members).
 545 tests.
 
+## 2026-09-13 (later): verify member on apply; login colour recorded
+
+apply gained a `verifyMember` stage right after branding: the profile's
+v3VerifyLoginEmail is looked up on the team (`/api/teams/{team}/contacts?
+filter[email]`), created there if absent, and added to the hub through
+`POST /api/admin/teams/{team}/hubs/{hub}/members` (409 = already a member).
+The contact must already exist globally with a password; an admin cannot set
+one. migrate's resume also had to carry the slug the hub was created with
+(read from the API), or the hub record hashes as a second plan and the
+resume is refused. test2 rerun: member added, verify accepted.
+
+The maroon login panel on test2 is legacy's `colors.secondary` (#A31C1C, its
+text colour) painted by V3's auth screen as the form-column surface. The
+colours are carried faithfully; V3's login layout assigns the token a
+different role. Recorded (README, radar row 26); a login-type page with a
+brand-panel slot would be the way to author it, not done.
+
