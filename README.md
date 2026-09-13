@@ -21,6 +21,17 @@ unquoted value at the first `#`, and the replica then reports a wrong password.
 `V3_VERIFY_LOGIN_EMAIL` through the backend's login route and use the access
 token, so no static key has to be minted for a one-off run.
 
+## A profile per target team
+
+Every production hub shares the API base, bucket, region, CDN and hub host;
+a profile only names the V3 team the hub is created in. `mio teams list`
+(logged in as that team's account) prints the id.
+
+    npx tsx src/cli/index.ts profile init <customer>-prod --team-id <team uuid>
+
+The profile name is what `--profile` takes and what names the ledger
+directory, so pick it once. The file is committed; it holds no secrets.
+
 ## The four stages
 
     npx tsx src/cli/index.ts extract alliance.mantalks.com

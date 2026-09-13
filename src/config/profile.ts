@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { z } from 'zod';
 
@@ -16,6 +16,36 @@ const ProfileSchema = z.object({
 });
 
 export type Profile = z.infer<typeof ProfileSchema>;
+
+/** Every production hub shares these; a profile only names the team it writes into. */
+export const PRODUCTION_DEFAULTS = {
+  apiBase: 'https://api.member.dev',
+  bucket: 'mio-backend-assets-production',
+  region: 'us-east-1',
+  cdnBase: 'https://miocdn.membership.io',
+  cdnBaseConfirmed: false,
+  hubBase: 'https://hub.member.dev',
+} as const;
+
+const PROFILE_NAME = /^[a-z0-9][a-z0-9-]*$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Writes `profiles/<name>.json` for a new target team with the production
+ * defaults. Refuses to overwrite an existing profile unless `force`, because a
+ * profile name is also the key of that hub's ledger directory.
+ */
+export function initProfile(name: string, teamId: string, opts: { dir?: string; force?: boolean } = {}): { path: string; profile: Profile } {
+  if (!PROFILE_NAME.test(name)) throw new Error(`profile name "${name}" must be lowercase letters, digits and dashes`);
+  if (!UUID.test(teamId)) throw new Error(`team id "${teamId}" is not a UUID; \`mio teams list\` prints the team's id`);
+  const dir = opts.dir ?? 'profiles';
+  const path = resolve(join(dir, `${name}.json`));
+  if (existsSync(path) && !opts.force) throw new Error(`profile ${path} already exists; pass --force to overwrite it`);
+  const profile = ProfileSchema.parse({ name, teamId, ...PRODUCTION_DEFAULTS });
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path, `${JSON.stringify(profile, null, 2)}\n`);
+  return { path, profile };
+}
 
 export function loadProfile(name: string, dir = 'profiles'): Profile {
   const path = resolve(join(dir, `${name}.json`));

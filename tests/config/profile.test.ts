@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { loadProfile } from '../../src/config/profile.js';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { PRODUCTION_DEFAULTS, initProfile, loadProfile } from '../../src/config/profile.js';
 
 describe('loadProfile', () => {
   it('loads the committed mantalks-prod profile', () => {
@@ -12,5 +15,25 @@ describe('loadProfile', () => {
 
   it('throws a clear error for an unknown profile', () => {
     expect(() => loadProfile('nope')).toThrow(/no profile "nope"/);
+  });
+
+});
+
+describe('initProfile', () => {
+  it('writes a profile with the production defaults, varying only name and team', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'profiles-'));
+    const { path, profile } = initProfile('acme-prod', '01a090ff-5ac3-7402-b686-66fd46af67bc', { dir });
+    expect(profile).toEqual({ name: 'acme-prod', teamId: '01a090ff-5ac3-7402-b686-66fd46af67bc', ...PRODUCTION_DEFAULTS });
+    expect(loadProfile('acme-prod', dir)).toEqual(profile);
+    expect(path.endsWith('/acme-prod.json')).toBe(true);
+  });
+
+  it('refuses a bad name, a non-UUID team id, and an existing file without --force', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'profiles-'));
+    expect(() => initProfile('Acme Prod', '01a090ff-5ac3-7402-b686-66fd46af67bc', { dir })).toThrow(/lowercase/);
+    expect(() => initProfile('acme-prod', 'team-42', { dir })).toThrow(/UUID/);
+    initProfile('acme-prod', '01a090ff-5ac3-7402-b686-66fd46af67bc', { dir });
+    expect(() => initProfile('acme-prod', '01a090ff-5ac3-7402-b686-66fd46af67bc', { dir })).toThrow(/--force/);
+    expect(() => initProfile('acme-prod', '01a090ff-5ac3-7402-b686-66fd46af67bc', { dir, force: true })).not.toThrow();
   });
 });

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { initProfile } from '../config/profile.js';
 import { Command } from 'commander';
 import { TOOL_VERSION } from '../version.js';
 import { runExtract, runPinBundle } from './extract.js';
@@ -113,6 +114,19 @@ program
   .requiredOption('--profile <name>', 'target profile name')
   .action((opts: { profile: string }) => {
     process.stdout.write(`${renderInventory(buildInventory(opts.profile))}\n`);
+  });
+
+const profileCmd = program.command('profile').description('target profiles');
+
+profileCmd
+  .command('init')
+  .description('write profiles/<name>.json for a new target team with the production defaults')
+  .argument('<name>', 'profile name, e.g. acme-prod; also names the ledger directory')
+  .requiredOption('--team-id <uuid>', 'the V3 team the hub is created in (mio teams list)')
+  .option('--force', 'overwrite an existing profile', false)
+  .action((name: string, opts: { teamId: string; force: boolean }) => {
+    const { path, profile } = initProfile(name, opts.teamId, { force: opts.force });
+    process.stdout.write(`wrote ${path} for team ${profile.teamId}\n`);
   });
 
 const ledger = program.command('ledger').description('ledger maintenance');
