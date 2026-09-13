@@ -414,3 +414,29 @@ fresh agent without the skill planned a plain `apply` with no `--resume`
 recorded ink limitation; with the skill it quoted the resume command, checked
 the radar first and named the right files.
 
+## 2026-09-13: migrate command, second hub, three fixes
+
+`migrate <address> --profile <name> --hub-slug <slug>` runs extract (pinned),
+map, apply and verify in one go and resumes from the ledger on a rerun
+(src/cli/migrate.ts). Profiles are the per-hub template (team id + six
+login fields), the shared V3 target lives in .env, `profile init` writes the
+template. Legacy default hosts `hub-<hash>.membership.io` resolve by decoding
+the hashid (src/extract/hubHost.ts).
+
+First hub through it: legacy 12607 "Web Developments" as V3 hub `test2`
+(01a09847-23ef-74d3-a94f-9112155526f3, run run-2026-09-13T00-59-51-796Z-
+ca4c3373, plan hub-12607-dfd2be02a140). Three things it exposed, all fixed:
+1. verify built the hub origin from the plan's derived slug, not the slug the
+   hub was created with; it now asks the API for the hub's slug.
+2. apply created hubs with `is_private: true`, which on V3 means TEAM-ONLY:
+   the slug lookup 404s for everyone else, so even the login page was
+   unreachable (mio-backend app/hubs/models.py:24-25, service.py:1314-1360).
+   Hubs are now created reachable with registration closed, and is_private
+   false is re-stated every run. The ManTalks hub had been flipped by hand
+   earlier, which is why it never showed. README section "Hub privacy",
+   radar row 25.
+3. The /content section-count mismatch (also open on ManTalks) is V3
+   rendering its own content page; verify now notes it for sign-off instead
+   of failing. test2 verify: accepted, authz skipped (no test members).
+545 tests.
+
