@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadEnv, secretsOf } from '../config/env.js';
+import { loadEnv, withProfileLogins, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from './auth.js';
 import { loadProfile } from '../config/profile.js';
 import { logger } from '../log/logger.js';
@@ -129,7 +129,7 @@ export async function runApply(options: ApplyOptions): Promise<string> {
     );
   }
 
-  const env = loadEnv('.env', { require: ['s3', 'cdn', 'logins'] });
+  const env = withProfileLogins(loadEnv('.env', { require: ['s3', 'cdn', 'logins'] }), profile);
   logger.setSecrets(secretsOf(env));
   const auth = await resolveApiAuth(profile, env);
   logger.setSecrets([...secretsOf(env), auth.token]);

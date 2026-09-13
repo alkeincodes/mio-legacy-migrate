@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { parse as parseDotenv } from 'dotenv';
 import { z } from 'zod';
+import type { Profile } from './profile.js';
 
 const EnvSchema = z.object({
   LEGACY_DB_HOST: z.string().min(1),
@@ -19,10 +20,11 @@ const EnvSchema = z.object({
   LEGACY_S3_BUCKET: z.string().min(1),
   LEGACY_S3_URL: z.string().url(),
   LEGACY_CDN_URL: z.string().url(),
-  LEGACY_HUB_LOGIN_EMAIL: z.string().min(1),
-  LEGACY_HUB_LOGIN_PASSWORD: z.string().min(1),
-  V3_VERIFY_LOGIN_EMAIL: z.string().min(1),
-  V3_VERIFY_LOGIN_PASSWORD: z.string().min(1),
+  // Logins normally come from the profile; these are the fallback for a profile that sets none.
+  LEGACY_HUB_LOGIN_EMAIL: z.string().default(''),
+  LEGACY_HUB_LOGIN_PASSWORD: z.string().default(''),
+  V3_VERIFY_LOGIN_EMAIL: z.string().default(''),
+  V3_VERIFY_LOGIN_PASSWORD: z.string().default(''),
   V3_PLATFORM_LOGIN_EMAIL: z.string().default(''),
   V3_PLATFORM_LOGIN_PASSWORD: z.string().default(''),
 });
@@ -60,13 +62,18 @@ export type EnvGroup = 's3' | 'cdn' | 'logins';
 const GROUP_KEYS: Record<EnvGroup, string[]> = {
   s3: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION', 'LEGACY_S3_BUCKET', 'LEGACY_S3_URL'],
   cdn: ['LEGACY_CDN_URL'],
-  logins: ['LEGACY_HUB_LOGIN_EMAIL', 'LEGACY_HUB_LOGIN_PASSWORD', 'V3_VERIFY_LOGIN_EMAIL', 'V3_VERIFY_LOGIN_PASSWORD'],
+  // Kept as a group name for callers; the values themselves are per profile (withProfileLogins) with .env as fallback.
+  logins: [],
 };
 const ALWAYS_KEYS = [
   'LEGACY_DB_HOST', 'LEGACY_DB_PORT', 'LEGACY_DB_USER', 'LEGACY_DB_PASSWORD', 'LEGACY_DB_NAME',
   'SSH_BOX_HOST', 'SSH_BOX_USER', 'SSH_KNOWN_HOSTS_FILE',
 ];
 const PLACEHOLDERS: Record<string, string> = {
+  LEGACY_HUB_LOGIN_EMAIL: '',
+  LEGACY_HUB_LOGIN_PASSWORD: '',
+  V3_VERIFY_LOGIN_EMAIL: '',
+  V3_VERIFY_LOGIN_PASSWORD: '',
   V3_PLATFORM_LOGIN_EMAIL: '',
   V3_PLATFORM_LOGIN_PASSWORD: '',
   V3_AWS_ACCESS_KEY_ID: '',
@@ -155,6 +162,30 @@ export function loadEnv(
     v3PlatformLoginEmail: e.V3_PLATFORM_LOGIN_EMAIL,
     v3PlatformLoginPassword: e.V3_PLATFORM_LOGIN_PASSWORD,
   };
+}
+
+/**
+ * The logins a run uses: the profile's own when it sets them, else the .env
+ * fallback. Each legacy hub has its own audience account and each V3 hub its
+ * own member, so a profile without them would silently verify the wrong hub;
+ * both are required to resolve to something.
+ */
+export function withProfileLogins(env: Env, profile: Pick<Profile, 'name' | 'legacyHubLoginEmail' | 'legacyHubLoginPassword' | 'v3VerifyLoginEmail' | 'v3VerifyLoginPassword' | 'v3PlatformLoginEmail' | 'v3PlatformLoginPassword'>): Env {
+  const pick = (own: string | undefined, fallback: string): string => (own && own.length > 0 ? own : fallback);
+  const out: Env = {
+    ...env,
+    legacyHubLoginEmail: pick(profile.legacyHubLoginEmail, env.legacyHubLoginEmail),
+    legacyHubLoginPassword: pick(profile.legacyHubLoginPassword, env.legacyHubLoginPassword),
+    v3VerifyLoginEmail: pick(profile.v3VerifyLoginEmail, env.v3VerifyLoginEmail),
+    v3VerifyLoginPassword: pick(profile.v3VerifyLoginPassword, env.v3VerifyLoginPassword),
+    v3PlatformLoginEmail: pick(profile.v3PlatformLoginEmail, env.v3PlatformLoginEmail),
+    v3PlatformLoginPassword: pick(profile.v3PlatformLoginPassword, env.v3PlatformLoginPassword),
+  };
+  const missing: string[] = [];
+  if (!out.legacyHubLoginEmail || !out.legacyHubLoginPassword) missing.push('legacyHubLoginEmail/legacyHubLoginPassword (or LEGACY_HUB_LOGIN_EMAIL/PASSWORD in .env)');
+  if (!out.v3VerifyLoginEmail || !out.v3VerifyLoginPassword) missing.push('v3VerifyLoginEmail/v3VerifyLoginPassword (or V3_VERIFY_LOGIN_EMAIL/PASSWORD in .env)');
+  if (missing.length > 0) throw new Error(`profile "${profile.name}" has no login for: ${missing.join('; ')}. Set them with profile init --legacy-login/--verify-login or edit profiles/${profile.name}.json`);
+  return out;
 }
 
 export function apiKeyVarName(profileName: string): string {

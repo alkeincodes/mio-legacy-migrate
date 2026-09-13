@@ -7,3 +7,4 @@ state/
 .playwright/
 .env
 .DS_Store
+profiles/*.json

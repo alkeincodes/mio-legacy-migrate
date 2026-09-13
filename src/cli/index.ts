@@ -123,10 +123,29 @@ profileCmd
   .description('write profiles/<name>.json for a new target team with the production defaults')
   .argument('<name>', 'profile name, e.g. acme-prod; also names the ledger directory')
   .requiredOption('--team-id <uuid>', 'the V3 team the hub is created in (mio teams list)')
+  .option('--legacy-login <email:password>', 'an audience member of the legacy hub, for verify')
+  .option('--verify-login <email:password>', 'a member of the V3 hub, for verify')
+  .option('--platform-login <email:password>', 'a platform (team) user for the API when no V3_API_KEY_<PROFILE> is set')
   .option('--force', 'overwrite an existing profile', false)
-  .action((name: string, opts: { teamId: string; force: boolean }) => {
-    const { path, profile } = initProfile(name, opts.teamId, { force: opts.force });
-    process.stdout.write(`wrote ${path} for team ${profile.teamId}\n`);
+  .action((name: string, opts: { teamId: string; legacyLogin?: string; verifyLogin?: string; platformLogin?: string; force: boolean }) => {
+    const split = (value: string | undefined, flag: string): [string, string] | null => {
+      if (value === undefined) return null;
+      const at = value.indexOf(':');
+      if (at <= 0 || at === value.length - 1) throw new Error(`${flag} wants email:password`);
+      return [value.slice(0, at), value.slice(at + 1)];
+    };
+    const legacy = split(opts.legacyLogin, '--legacy-login');
+    const verify = split(opts.verifyLogin, '--verify-login');
+    const platform = split(opts.platformLogin, '--platform-login');
+    const { path, profile } = initProfile(name, opts.teamId, {
+      force: opts.force,
+      logins: {
+        ...(legacy ? { legacyHubLoginEmail: legacy[0], legacyHubLoginPassword: legacy[1] } : {}),
+        ...(verify ? { v3VerifyLoginEmail: verify[0], v3VerifyLoginPassword: verify[1] } : {}),
+        ...(platform ? { v3PlatformLoginEmail: platform[0], v3PlatformLoginPassword: platform[1] } : {}),
+      },
+    });
+    process.stdout.write(`wrote ${path} for team ${profile.teamId} (not committed; it holds credentials)\n`);
   });
 
 const ledger = program.command('ledger').description('ledger maintenance');

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { loadEnv, secretsOf } from '../config/env.js';
+import { loadEnv, withProfileLogins, secretsOf } from '../config/env.js';
 import { resolveApiAuth } from '../apply/auth.js';
 import { assetReferences } from '../apply/stages.js';
 import { loadProfile } from '../config/profile.js';
@@ -22,9 +22,9 @@ export async function runVerify(opts: {
   /** Capture the contact sheet; off by default until the assets have landed. */
   shots?: boolean;
 }): Promise<AcceptanceVerdict> {
-  const env = loadEnv('.env', { require: ['cdn', 'logins'] });
-  logger.setSecrets(secretsOf(env));
   const profile = loadProfile(opts.profileName);
+  const env = withProfileLogins(loadEnv('.env', { require: ['cdn', 'logins'] }), profile);
+  logger.setSecrets(secretsOf(env));
   const auth = await resolveApiAuth(profile, env);
   const apiKey = auth.token;
   logger.setSecrets([...secretsOf(env), apiKey]);

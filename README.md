@@ -21,16 +21,23 @@ unquoted value at the first `#`, and the replica then reports a wrong password.
 `V3_VERIFY_LOGIN_EMAIL` through the backend's login route and use the access
 token, so no static key has to be minted for a one-off run.
 
-## A profile per target team
+## A profile per hub
 
 Every production hub shares the API base, bucket, region, CDN and hub host;
-a profile only names the V3 team the hub is created in. `mio teams list`
-(logged in as that team's account) prints the id.
+a profile names the V3 team the hub is created in and carries that hub's
+logins: an audience member of the legacy hub and a member of the V3 hub
+(verify logs into both sites with them), and optionally a platform user for
+the API when no `V3_API_KEY_<PROFILE>` is set. `mio teams list` (logged in
+as that team's account) prints the team id.
 
-    npx tsx src/cli/index.ts profile init <customer>-prod --team-id <team uuid>
+    npx tsx src/cli/index.ts profile init <customer>-prod --team-id <team uuid> \
+      --legacy-login member@customer.com:pw --verify-login member@customer.com:pw \
+      --platform-login owner@customer.com:pw
 
 The profile name is what `--profile` takes and what names the ledger
-directory, so pick it once. The file is committed; it holds no secrets.
+directory, so pick it once. `profiles/*.json` is gitignored: profiles hold
+credentials. The `LEGACY_HUB_LOGIN_*` and `V3_VERIFY_LOGIN_*` values in
+`.env` are only the fallback for a profile that sets none.
 
 ## The four stages
 
