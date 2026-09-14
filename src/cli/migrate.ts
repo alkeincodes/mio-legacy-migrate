@@ -121,10 +121,10 @@ function hubLoginsBlank(env: Env): string[] {
 function commitLedger(dir: string, message: string): void {
   if (!existsSync(dir)) return;
   try {
-    const ignored = execFileSync('git', ['check-ignore', '-q', dir], { stdio: 'ignore' }) !== undefined ? true : false;
-    if (ignored) return;
+    execFileSync('git', ['check-ignore', '-q', dir], { stdio: 'ignore' });
+    return; // exit 0: the ledger is ignored, nothing to commit
   } catch {
-    // not ignored: check-ignore exits 1
+    // exit 1: tracked, commit it below
   }
   try {
     execFileSync('git', ['add', dir], { stdio: 'ignore' });
