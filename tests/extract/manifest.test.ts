@@ -140,3 +140,52 @@ describe('hub-owned decoration media', () => {
     expect(unpinned.versionId).toBe('fresh');
   });
 });
+
+describe('head concurrency and progress', () => {
+  const variants = 8;
+  const rows: LegacyMedia[] = Array.from({ length: variants / 2 }, (_, i) => ({
+    ...mediaRow, id: 100 + i, model_id: 5, file_name: `f${i}.png`,
+  }));
+
+  function trackingHead(delayFor: (key: string) => number) {
+    let inFlight = 0;
+    let peak = 0;
+    const fn = async (_b: string, key: string): Promise<HeadResult> => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, delayFor(key)));
+      inFlight -= 1;
+      return { sizeBytes: 1, etag: `"${key}"`, versionId: 'v', checksumCrc64Nvme: null, contentType: 'image/png' };
+    };
+    return { fn, peak: () => peak };
+  }
+
+  it('runs heads in parallel up to the concurrency limit', async () => {
+    const tracker = trackingHead(() => 5);
+    await buildManifest({ ...base, media: rows }, tracker.fn, { concurrency: 3 });
+    expect(tracker.peak()).toBe(3);
+  });
+
+  it('keeps entries in media and variant order however the heads resolve', async () => {
+    // Originals answer last so a naive push-on-resolve would reverse the order.
+    const tracker = trackingHead((key) => (key.includes('conversions') ? 1 : 20));
+    const { entries } = await buildManifest({ ...base, media: rows }, tracker.fn, { concurrency: 8 });
+    expect(entries.map((e) => `${e.legacyMediaId}:${e.variant}`)).toEqual(
+      rows.flatMap((r) => [`${r.id}:original`, `${r.id}:optimized_thumbnail`]),
+    );
+  });
+
+  it('reports progress once per head, ending at the total', async () => {
+    const seen: Array<[number, number]> = [];
+    await buildManifest({ ...base, media: rows }, head, { concurrency: 4, onProgress: (d, t) => seen.push([d, t]) });
+    expect(seen.map(([d]) => d)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(seen.every(([, t]) => t === variants)).toBe(true);
+  });
+
+  it('pinManifest reports progress the same way', async () => {
+    const { entries } = await buildManifest({ ...base, media: rows }, unpinnedHeadFor(rows));
+    const seen: number[] = [];
+    await pinManifest(entries, 'legacy-bucket', head, { concurrency: 4, onProgress: (d) => seen.push(d) });
+    expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+});

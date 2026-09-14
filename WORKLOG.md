@@ -488,3 +488,22 @@ probing. All fixed, applied by `migrate` resume, verify accepted.
    scopes every internal href with the hub's slug read from the API.
 551 tests.
 
+
+## 2026-09-14: the S3 pin is parallel and shows progress
+
+`migrate alliance.mantalks.com --profile test3` sat on "ssh tunnel up" for
+thirteen minutes and looked frozen. It was pinning the manifest: one S3
+HEAD per media variant, 3,086 of them for ManTalks, one at a time, with no
+output until the loop ended. Nobody had timed it before because the earlier
+ManTalks extract ran `--skip-s3` and the pin ran separately.
+
+- `buildManifest` and `pinManifest` now head with 16 in flight
+  (`HeadOptions.concurrency`), and assemble entries in the original
+  media/variant order so the bundle stays stable across runs.
+- Both take `onProgress`; `src/cli/progress.ts` draws one line in place on a
+  terminal (`pinning S3 manifest: 512/3086 (16%)`) and prints a line per 10%
+  step when piped, so a log file stays readable.
+- Timed on the 09-11 ManTalks bundle: 48 s for 3,065 objects, was ~13 min.
+
+Tests: 558. The test3 run reached map (`plans/hub-38827-5258427c8e40.json`)
+and stopped before apply; no ledger for test3 yet.

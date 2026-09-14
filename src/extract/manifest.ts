@@ -47,6 +47,38 @@ export interface HeadResult {
 /** HeadObject on the source; `versionId` pins the call to an already-pinned version so a re-pin reads the same object. */
 export type HeadObjectFn = (bucket: string, key: string, versionId?: string | null) => Promise<HeadResult | null>;
 
+export interface HeadOptions {
+  /** Heads in flight at once; S3 HEAD is cheap and the client pools connections. */
+  concurrency?: number;
+  /** Called after every head with the running count, for a progress line. */
+  onProgress?: (done: number, total: number) => void;
+}
+
+const DEFAULT_HEAD_CONCURRENCY = 16;
+
+/** Runs `fn` over `items` with at most `limit` in flight; results keep the input order. */
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+  onProgress?: (done: number, total: number) => void,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  let done = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next;
+      next += 1;
+      results[i] = await fn(items[i]!);
+      done += 1;
+      onProgress?.(done, items.length);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
+  return results;
+}
+
 export interface ManifestInput {
   files: LegacyFile[];
   media: LegacyMedia[];
@@ -62,6 +94,7 @@ export interface ManifestInput {
 export async function buildManifest(
   input: ManifestInput,
   head: HeadObjectFn,
+  options: HeadOptions = {},
 ): Promise<{
   entries: AssetManifestEntry[];
   missing: Array<{ legacyMediaId: number; variant: string; key: string }>;
@@ -75,6 +108,18 @@ export async function buildManifest(
 
   const entries: AssetManifestEntry[] = [];
   const missing: Array<{ legacyMediaId: number; variant: string; key: string }> = [];
+
+  // Decide every variant first, head them in parallel, then assemble in the
+  // original media/variant order so the bundle is stable across runs.
+  const work: Array<{
+    media: LegacyMedia;
+    variant: ReturnType<typeof variantsOf>[number];
+    file: LegacyFile | null | undefined;
+    decoration: boolean;
+    playlistIds: number[];
+    gates: LegacyGate[];
+    visibility: AssetVisibility;
+  }> = [];
 
   for (const media of input.media) {
     // Page decoration: a section's image lives in the Hub's `thumbnails`
@@ -103,33 +148,44 @@ export async function buildManifest(
         : 'restricted';
 
     for (const variant of variantsOf(media)) {
-      const result = await head(input.bucket, variant.key);
-      if (!result) {
-        missing.push({ legacyMediaId: media.id, variant: variant.variant, key: variant.key });
-        continue;
-      }
-      entries.push({
-        legacyFileId: file?.id ?? 0,
-        ...(decoration ? { legacyOwner: { type: media.model_type, id: media.model_id } } : {}),
-        legacyMediaId: media.id,
-        variant: variant.variant,
-        disk: variant.disk,
-        sourceBucket: input.bucket,
-        sourceKey: variant.key,
-        sizeBytes: result.sizeBytes,
-        etag: result.etag,
-        versionId: result.versionId,
-        checksumCrc64Nvme: result.checksumCrc64Nvme,
-        mimeType: result.contentType ?? media.mime_type,
-        cdnUrl: cdnUrlFor(variant.key, input.s3Url, input.cdnUrl),
-        folderIds: file?.folder_id == null ? [] : [file.folder_id],
-        playlistIds,
-        visibility,
-        gates: visibility === 'restricted' ? gates : [],
-        captionUrls: [],
-      });
+      work.push({ media, variant, file, decoration, playlistIds, gates, visibility });
     }
   }
+
+  const results = await mapLimit(
+    work,
+    options.concurrency ?? DEFAULT_HEAD_CONCURRENCY,
+    (w) => head(input.bucket, w.variant.key),
+    options.onProgress,
+  );
+
+  work.forEach(({ media, variant, file, decoration, playlistIds, gates, visibility }, i) => {
+    const result = results[i];
+    if (!result) {
+      missing.push({ legacyMediaId: media.id, variant: variant.variant, key: variant.key });
+      return;
+    }
+    entries.push({
+      legacyFileId: file?.id ?? 0,
+      ...(decoration ? { legacyOwner: { type: media.model_type, id: media.model_id } } : {}),
+      legacyMediaId: media.id,
+      variant: variant.variant,
+      disk: variant.disk,
+      sourceBucket: input.bucket,
+      sourceKey: variant.key,
+      sizeBytes: result.sizeBytes,
+      etag: result.etag,
+      versionId: result.versionId,
+      checksumCrc64Nvme: result.checksumCrc64Nvme,
+      mimeType: result.contentType ?? media.mime_type,
+      cdnUrl: cdnUrlFor(variant.key, input.s3Url, input.cdnUrl),
+      folderIds: file?.folder_id == null ? [] : [file.folder_id],
+      playlistIds,
+      visibility,
+      gates: visibility === 'restricted' ? gates : [],
+      captionUrls: [],
+    });
+  });
 
   return { entries, missing };
 }
@@ -153,13 +209,20 @@ export async function pinManifest(
   entries: AssetManifestEntry[],
   bucket: string,
   head: HeadObjectFn,
+  options: HeadOptions = {},
 ): Promise<Array<{ legacyMediaId: number; variant: string; key: string }>> {
   const missing: Array<{ legacyMediaId: number; variant: string; key: string }> = [];
-  for (const entry of entries) {
-    const result = await head(bucket, entry.sourceKey, entry.versionId);
+  const results = await mapLimit(
+    entries,
+    options.concurrency ?? DEFAULT_HEAD_CONCURRENCY,
+    (entry) => head(bucket, entry.sourceKey, entry.versionId),
+    options.onProgress,
+  );
+  entries.forEach((entry, i) => {
+    const result = results[i];
     if (!result) {
       missing.push({ legacyMediaId: entry.legacyMediaId, variant: entry.variant, key: entry.sourceKey });
-      continue;
+      return;
     }
     entry.sourceBucket = bucket;
     entry.sizeBytes = result.sizeBytes;
@@ -167,6 +230,6 @@ export async function pinManifest(
     entry.versionId = result.versionId;
     entry.checksumCrc64Nvme = result.checksumCrc64Nvme;
     entry.mimeType = result.contentType ?? entry.mimeType;
-  }
+  });
   return missing;
 }

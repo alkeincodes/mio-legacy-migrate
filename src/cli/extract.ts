@@ -13,6 +13,7 @@ import {
   MORPH_PLAYLIST, MORPH_SECTION,
 } from '../extract/queries.js';
 import { buildManifest, pinManifest, unpinnedHeadFor, type HeadObjectFn, type HeadResult, type LegacyGate } from '../extract/manifest.js';
+import { progressLine } from './progress.js';
 import { readBundle, writeBundle, type Bundle } from '../extract/bundle.js';
 import { normaliseHubHost } from '../extract/hubHost.js';
 import type { Env } from '../config/env.js';
@@ -51,7 +52,9 @@ export async function runPinBundle(bundlePath: string): Promise<string> {
   const env = loadEnv('.env', { require: ['s3', 'cdn'] });
   logger.setSecrets(secretsOf(env));
   const bundle = readBundle(bundlePath);
-  const missing = await pinManifest(bundle.assets, env.legacyS3Bucket, s3Head(env));
+  const progress = progressLine('pinning S3 manifest');
+  const missing = await pinManifest(bundle.assets, env.legacyS3Bucket, s3Head(env), { onProgress: progress.tick });
+  progress.done();
   bundle.assets = bundle.assets.filter((a) => !missing.some((m) => m.key === a.sourceKey));
   bundle.missingAssets = [...bundle.missingAssets, ...missing];
   bundle.header.manifestPinned = true;
@@ -162,6 +165,7 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
     }
 
     const head = options.skipS3 ? unpinnedHeadFor(media) : s3Head(env);
+    const progress = progressLine(options.skipS3 ? 'listing media variants' : 'pinning S3 manifest');
 
     const { entries, missing } = await buildManifest(
       {
@@ -175,7 +179,9 @@ export async function runExtract(options: ExtractOptions): Promise<string> {
         cdnUrl: env.legacyCdnUrl,
       },
       head,
+      { onProgress: progress.tick },
     );
+    progress.done();
 
     const bundle: Bundle = {
       header: {
