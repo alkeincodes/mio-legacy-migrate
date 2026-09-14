@@ -8,8 +8,17 @@ import Hashids from 'hashids';
  * config/hashids.php:209-213). The replica stores nothing for that last form,
  * so the host has to be decoded back to the id.
  */
-const SUBDOMAIN_HASHIDS = new Hashids('REDACTED-LEGACY-HASHIDS-SALT', 10, 'abcdefghijklmnopqrstuvwxyz0123456789');
 const DEFAULT_HOST = /^hub-([a-z0-9]{10})\.membership\.io$/;
+
+/**
+ * The salt of that connection is a legacy production secret and lives in
+ * `.env` as LEGACY_HASHIDS_SALT, never in this repo. Without it a default
+ * host cannot be decoded; every other host form still works.
+ */
+function subdomainHashids(): Hashids | null {
+  const salt = process.env['LEGACY_HASHIDS_SALT']?.trim();
+  return salt ? new Hashids(salt, 10, 'abcdefghijklmnopqrstuvwxyz0123456789') : null;
+}
 
 /** What a migrator pastes (a URL, a host, with or without a path) to the bare lowercase host. */
 export function normaliseHubHost(input: string): string {
@@ -24,12 +33,18 @@ export function normaliseHubHost(input: string): string {
 export function hubIdFromHost(host: string): number | null {
   const match = DEFAULT_HOST.exec(host);
   if (!match) return null;
-  const [first] = SUBDOMAIN_HASHIDS.decode(match[1] ?? '');
+  const hashids = subdomainHashids();
+  if (!hashids) {
+    throw new Error(`"${host}" is a default hub host; decoding it needs LEGACY_HASHIDS_SALT in .env (searchie config/hashids.php, the hub.subdomain connection). Pass the hub's custom domain or subdomain instead.`);
+  }
+  const [first] = hashids.decode(match[1] ?? '');
   const id = Number(first);
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 /** The default host a hub answers at when it has no custom domain. */
 export function defaultHostFor(hubId: number): string {
-  return `hub-${SUBDOMAIN_HASHIDS.encode(hubId)}.membership.io`;
+  const hashids = subdomainHashids();
+  if (!hashids) throw new Error('defaultHostFor needs LEGACY_HASHIDS_SALT in .env');
+  return `hub-${hashids.encode(hubId)}.membership.io`;
 }

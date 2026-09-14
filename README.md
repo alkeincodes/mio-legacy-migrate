@@ -21,6 +21,11 @@ unquoted value at the first `#`, and the replica then reports a wrong password.
 `V3_VERIFY_LOGIN_EMAIL` through the backend's login route and use the access
 token, so no static key has to be minted for a one-off run.
 
+To migrate a hub by its default `hub-<hash>.membership.io` host, `.env` also
+needs `LEGACY_HASHIDS_SALT`, the salt of searchie's `hub.subdomain` hashids
+connection. It is a production secret and is not in this repo; a hub's custom
+domain or subdomain resolves without it.
+
 ## A profile per hub
 
 `.env` holds what every hub shares: the legacy replica and box, the AWS pairs,

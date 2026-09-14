@@ -13,6 +13,7 @@ import {
   MORPH_PLAYLIST,
 } from '../../src/extract/queries.js';
 import type { SnapshotSession } from '../../src/extract/db.js';
+import { defaultHostFor } from '../../src/extract/hubHost.js';
 
 function recorder(results: unknown[][] = []): SnapshotSession & { calls: Array<[string, unknown[]]> } {
   const calls: Array<[string, unknown[]]> = [];
@@ -46,8 +47,10 @@ describe('findHubByDomain', () => {
 
 describe('findHubByHost', () => {
   it('looks a default hub-<hash> host up by its decoded id', async () => {
+    process.env['LEGACY_HASHIDS_SALT'] = 'test-salt-not-the-real-one';
     const session = recorder([[{ id: 12607, title: 'Web Developments' }]]);
-    const hub = await findHubByHost(session, 'hub-edxg119xn8.membership.io');
+    const hub = await findHubByHost(session, defaultHostFor(12607));
+    delete process.env['LEGACY_HASHIDS_SALT'];
     expect(hub?.id).toBe(12607);
     const [sql, params] = session.calls[0]!;
     expect(sql).toMatch(/WHERE id = \?/);
