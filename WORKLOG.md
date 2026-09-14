@@ -546,3 +546,15 @@ fixtures and tests use.
 Also: `scripts/probe/auth-probe.mjs <slug> <login|register>` measures the live
 auth screen (h1 colour, panel colours, hub CSS vars) and saves a screenshot.
 Tests: 569. Radar v6 (28 rows).
+
+## 2026-09-14: public repository
+
+Pushed to https://github.com/alkeincodes/mio-legacy-migrate (public). Before
+the push: the legacy hashids salt moved from `src/extract/hubHost.ts` to
+`.env` as `LEGACY_HASHIDS_SALT`, and the probe script lost its default member
+login. Both literals were scrubbed from every commit with `git filter-repo
+--replace-text`, so commit hashes before this point differ from any older
+clone. A pre-rewrite bundle was kept outside the repo. A full-history scan for
+key ids, JWTs, private keys and password assignments found nothing else. `.env`
+was never committed; the three tracked ledgers hold ids and hashes, no
+personal data.
