@@ -8,3 +8,4 @@ state/
 .env
 .DS_Store
 profiles/*.json
+ledger/

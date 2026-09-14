@@ -558,3 +558,11 @@ clone. A pre-rewrite bundle was kept outside the repo. A full-history scan for
 key ids, JWTs, private keys and password assignments found nothing else. `.env`
 was never committed; the three tracked ledgers hold ids and hashes, no
 personal data.
+
+## 2026-09-14, later: ledger out of git
+
+`ledger/` names customer hubs, so it is gitignored and was removed from every
+commit with `git filter-repo --path ledger --invert-paths`; the remote was
+force-pushed. The three ledgers stay on disk (backed up outside the repo
+first). The clean-ledger gate is unaffected (ignored files are never
+"changes"); `migrate` skips its ledger commit when the directory is ignored.

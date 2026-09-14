@@ -112,9 +112,20 @@ function hubLoginsBlank(env: Env): string[] {
   return blank;
 }
 
-/** The clean-ledger gate refuses an apply over uncommitted ledger changes; the ledger is meant to be committed after every run. */
+/**
+ * The clean-ledger gate refuses an apply over uncommitted ledger changes. In a
+ * repo that tracks the ledger this commits it around each run; in one that
+ * ignores it (this repo since 2026-09-14: the ledger holds customer ids and
+ * stays local) there is nothing to commit and the gate sees no changes.
+ */
 function commitLedger(dir: string, message: string): void {
   if (!existsSync(dir)) return;
+  try {
+    const ignored = execFileSync('git', ['check-ignore', '-q', dir], { stdio: 'ignore' }) !== undefined ? true : false;
+    if (ignored) return;
+  } catch {
+    // not ignored: check-ignore exits 1
+  }
   try {
     execFileSync('git', ['add', dir], { stdio: 'ignore' });
     const status = execFileSync('git', ['status', '--porcelain', '--', dir]).toString();

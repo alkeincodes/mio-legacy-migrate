@@ -6,12 +6,10 @@ The live hub is `01a09204-a0ac-76e2-9658-cc9bc9e1b42f`, https://hub.member.dev/a
 nvm use
 npx vitest run && npm run typecheck
 npm run cli -- map --bundle bundles/<newest hub-38827-*.json>          # prints the plan path and the fidelity summary
-git add ledger && git commit -m "ledger: …"                             # only if the ledger is modified (a stopped run leaves it so)
 npm run cli -- apply --profile mantalks-prod --plan plans/<new>.json \
   --resume run-2026-09-11T19-49-29-036Z-b3f055c6 --accept-plan-change --rewrite-pages \
   --skip-assets --publish-held --hub-slug alliance > /tmp/apply.log 2>&1; echo exit=$?
 tail -1 /tmp/apply.log                                                  # must say "apply finished"
-git add ledger && git commit -m "ledger: after <what>"
 ```
 
 Or, for any hub set up with `profile init`, the one command that does map and apply (and extract, verify) with the resume worked out from the ledger:
@@ -24,7 +22,7 @@ npm run cli -- migrate <legacy address> --profile <name>        # resumes; --hub
 
 Facts that bite:
 
-- The clean-ledger gate refuses to start when `ledger/` has uncommitted changes. Commit after every apply, stopped or not.
+- `ledger/` is gitignored since 2026-09-14 (customer ids); the clean-ledger gate sees no changes there. Back the directory up outside git; a lost ledger means a lost resume.
 - V3 allows 60 page publishes an hour per client. Only pages whose tree changed are republished; a full rewrite is 27 pages, so at most two full applies an hour. A budget stop is clean: trees already written stay live (publish happens after the tree write), the log names the earliest resume time.
 - A shell wrapper (`sleep …; npm run cli -- apply …`) reports its own exit code. Read the apply log's last line.
 - The dry-run renderer lists plan operations without consulting the ledger; its `page.create` lines are expected on a resume.

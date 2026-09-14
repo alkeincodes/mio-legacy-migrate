@@ -58,7 +58,9 @@ domain (`alliance.mantalks.com`) or the default `hub-<hash>.membership.io`.
 Add `--dry-run` to stop after the apply dry run. A rerun of the same command
 resumes the run the ledger holds for that profile and legacy hub (the plan
 changes are accepted and changed page trees rewritten), so a second hub can
-never be created by accident; the ledger is committed to git around each run.
+never be created by accident. The ledger under `ledger/` is the record of
+what each run created; it names customer hubs and stays local (gitignored),
+so back it up outside git.
 Verify runs only when both hub logins in the profile are filled; the V3
 member cannot exist before the first apply creates the hub, so a first run
 always skips it and says so.
