@@ -7,7 +7,7 @@
  *   node scripts/probe/hub-probe.mjs images  <page-path> "<section text>"   every <img> with its wrapper chain
  *
  * Environment: PROBE_HUB (default https://hub.member.dev/alliance), PROBE_EMAIL,
- * PROBE_PASSWORD (default the test member PROBE_EMAIL / PROBE_PASSWORD).
+ * PROBE_EMAIL and PROBE_PASSWORD, a hub member's login; both are required, there are no defaults.
  * Logs in through <hub>/login the way src/verify/browser.ts does, then waits for
  * the first section to render (never networkidle: the hub keeps a socket open).
  */
@@ -19,8 +19,12 @@ if (!mode || !pagePath || !needle) {
   process.exit(2);
 }
 const hub = process.env['PROBE_HUB'] ?? 'https://hub.member.dev/alliance';
-const email = process.env['PROBE_EMAIL'] ?? 'alkein@membership.io';
+const email = process.env['PROBE_EMAIL'] ?? '';
 const password = process.env['PROBE_PASSWORD'] ?? '';
+if (!email || !password) {
+  console.error('set PROBE_EMAIL and PROBE_PASSWORD to a hub member login');
+  process.exit(2);
+}
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: mode === 'shot' ? 2 : 1 });
