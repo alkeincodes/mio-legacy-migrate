@@ -65,6 +65,11 @@ describe('validateTree', () => {
     expect(validateTree(catalog, tree)).toContain('node a: top-level section node carries no template');
   });
 
+  it('accepts an untemplated root child tagged as a slot region, the shape the auth brand panel takes', () => {
+    const tree = root([{ id: 'panel', kind: 'stack', settings: { slot: 'brand-panel' }, children: [] }]);
+    expect(validateTree(catalog, tree)).toEqual([]);
+  });
+
   it('rejects a template that is not in the catalog', () => {
     const tree = root([{ id: 'a', kind: 'container', template: 'mystery', children: [] }]);
     expect(validateTree(catalog, tree)).toContain('node a: unknown template "mystery"');

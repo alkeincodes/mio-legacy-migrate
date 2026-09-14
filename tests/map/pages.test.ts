@@ -109,7 +109,7 @@ describe('excluded page types', () => {
     { id: row + 1, hub_id: 7, page_id: null, parent_id: row, model_type: null, model_id: null, hidden: 0, type: 'column', title: null, label: null, settings: '{}', permissions: null, meta: null, position: 0, segment_id: null },
   ];
 
-  it('leaves out login, register, onboarding and discussions by default, records each with a warning, and routes links to the built-in surface', async () => {
+  it('authors login and register as V3 auth pages, leaves out onboarding and discussions with a warning each, and routes links to the built-in surface', async () => {
     const { mapPages } = await import('../../src/map/pages.js');
     const bundle = {
       header: { legacyHubId: 7, legacyHubDomain: 'x.example.com' }, hub: { id: 7, auth: 1 },
@@ -122,9 +122,9 @@ describe('excluded page types', () => {
       media: [], segmentables: [], segments: [], assets: [],
     } as unknown as Parameters<typeof mapPages>[0];
     const { pages, excluded, warnings, renames } = mapPages(bundle);
-    expect(pages.map((p) => p.slug)).toEqual(['about']);
-    expect(excluded.map((e) => `${e.legacyPageId}:${e.legacyType}->/${e.route}`)).toEqual(['1:login->/login', '2:register->/register', '3:onboarding->/onboarding', '4:discussions->/discussions']);
-    expect(warnings.filter((w) => w.type === 'excluded')).toHaveLength(4);
+    expect(pages.map((p) => `${p.slug}:${p.pageType}`)).toEqual(['about:generic', 'sign-in:login', 'sign-up:register']);
+    expect(excluded.map((e) => `${e.legacyPageId}:${e.legacyType}->/${e.route}`)).toEqual(['3:onboarding->/onboarding', '4:discussions->/discussions']);
+    expect(warnings.filter((w) => w.type === 'excluded')).toHaveLength(2);
     expect(renames).toEqual([]);
     const walk = (n: { children?: unknown[] }): unknown[] => [n, ...((n.children ?? []) as never[]).flatMap(walk)];
     const btn = walk(pages[0]!.tree).find((n) => (n as { kind?: string }).kind === 'button') as { settings: { action: unknown } };
@@ -139,8 +139,8 @@ describe('excluded page types', () => {
       sections: [], media: [], segmentables: [], segments: [], assets: [],
     } as unknown as Parameters<typeof mapPages>[0];
     const { pages, excluded } = mapPages(bundle, { excludePageTypes: ['login'] });
-    expect(pages.map((p) => p.slug)).toEqual(['discussions-page']);
-    expect(excluded.map((e) => e.legacyPageId)).toEqual([1]);
+    expect(pages.map((p) => p.slug)).toEqual(['discussions-page', 'sign-in']);
+    expect(excluded).toEqual([]);
   });
 });
 

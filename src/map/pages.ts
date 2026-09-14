@@ -2,6 +2,7 @@ import type { Bundle } from '../extract/bundle.js';
 import { MORPH_FILE, type LegacyHub, type LegacyPage, type LegacySection } from '../extract/queries.js';
 import type { CatalogNode } from './catalog.js';
 import { parseJsonObject } from '../extract/json.js';
+import { mapAuthPages } from './auth.js';
 import { mapElement } from './elements.js';
 import { nodeId } from './nodeId.js';
 import type { PlanAccessRule, PlanExcludedPage, PlanPage, PlanWarning } from './plan.js';
@@ -92,19 +93,11 @@ export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
   const accessRules: PlanAccessRule[] = [];
   const taken = new Set<string>();
   const excludeTypes = new Set(options.excludePageTypes ?? DEFAULT_EXCLUDED_PAGE_TYPES);
-  const excluded: PlanExcludedPage[] = [];
   const excludedRouteById = new Map<number, string>();
   for (const page of bundle.pages) {
     if (!excludeTypes.has(page.type)) continue;
     // The built-in route carries the legacy type's name (login, register, onboarding, discussions).
     excludedRouteById.set(page.id, page.type);
-    excluded.push({ legacyPageId: page.id, title: page.title ?? page.type, legacyType: page.type, route: page.type });
-    warnings.push({
-      pageSlug: page.slug ?? page.type,
-      legacySectionId: null,
-      type: 'excluded',
-      reason: `legacy page "${page.title ?? page.type}" (type ${page.type}) is not migrated: V3 serves /${page.type} itself; links to it go there and its menu items are dropped`,
-    });
   }
 
   const mediaByFileId = new Map<number, number>();
@@ -258,6 +251,26 @@ export function mapPages(bundle: Bundle, options: MapPagesOptions = {}): {
         children,
       },
       restrictedSectionNodeIds,
+    });
+  }
+
+  // Login and register are authored as V3's own login and register pages
+  // (their brand panel carries the legacy look); links and menu items to them
+  // still go to the built-in /login and /register routes. Everything else V3
+  // serves itself is left out and reported.
+  const auth = mapAuthPages(bundle, taken, excludeTypes);
+  pages.push(...auth.pages);
+  warnings.push(...auth.warnings);
+  const authored = new Set(auth.pages.map((p) => p.legacyPageId));
+  const excluded: PlanExcludedPage[] = [];
+  for (const page of bundle.pages) {
+    if (!excludedRouteById.has(page.id) || authored.has(page.id)) continue;
+    excluded.push({ legacyPageId: page.id, title: page.title ?? page.type, legacyType: page.type, route: page.type });
+    warnings.push({
+      pageSlug: page.slug ?? page.type,
+      legacySectionId: null,
+      type: 'excluded',
+      reason: `legacy page "${page.title ?? page.type}" (type ${page.type}) is not migrated: V3 serves /${page.type} itself; links to it go there and its menu items are dropped`,
     });
   }
 

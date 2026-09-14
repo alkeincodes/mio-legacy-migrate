@@ -61,7 +61,9 @@ export function validateTree(catalog: Catalog, root: CatalogNode): string[] {
     if (node.template !== undefined && !templateIds.has(node.template) && depth > 0) {
       violations.push(`node ${label}: unknown template "${node.template}"`);
     }
-    if (depth === 1 && node.template === undefined) {
+    // A root child tagged `settings.slot` is a named region (the auth brand
+    // panel), not a section; it carries no template by design.
+    if (depth === 1 && node.template === undefined && node.settings?.['slot'] === undefined) {
       violations.push(`node ${label}: top-level section node carries no template`);
     }
     if (node.value !== undefined && node.children !== undefined) {

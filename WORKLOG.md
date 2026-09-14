@@ -507,3 +507,42 @@ ManTalks extract ran `--skip-s3` and the pin ran separately.
 
 Tests: 558. The test3 run reached map (`plans/hub-38827-5258427c8e40.json`)
 and stopped before apply; no ledger for test3 yet.
+
+## 2026-09-14: auth and onboarding pages authored from the legacy login look
+
+Legacy paints login, register and onboarding with one split layout: a brand
+panel (logo, footer) beside the form. Its background is the page's
+`settings.background`, else the theme's `pages.<type>.background`; the default
+is a 5% wash of the text colour (`_common.scss:116-135`), dark hubs fill with
+secondary under white, an image panel has white text; the side comes from
+`hub.meta.<type>.sections`, the logo size from `pages.<type>.logoSize`.
+
+V3 renders every auth screen and onboarding through `BrandedAuthShell` from
+the hub's `login` page (register from `register`): the first root child tagged
+`settings.slot: "brand-panel"` gives the panel `surface`, `side` and
+`logoSize` (a px number). Those settings exist, so `src/map/auth.ts` authors
+a `login` page at `/sign-in` and a `register` page at `/sign-up` (the route
+names are reserved slugs; the backend finds these pages by type) whose panel
+carries the legacy background, side and logo size. Fidelity for what the slot
+cannot take: `auth.panel.ink` (only light/dark), `auth.panel.position`,
+`auth.panel.logo` (cannot hide), `auth.register.copy`, and
+`auth.onboarding.background` when onboarding had its own. Onboarding and
+discussions stay excluded; links and menu items to login/register still go
+to `/login` and `/register`. Verify skips the auth pages in its screenshot
+pass and counts a slot region as a section.
+
+Applied to test2 (2 pages, verify accepted), then found the panel never
+reaches the screen: the backend's anonymous render filters the tree through
+`filter_tree_for_anon_safety`, which requires every templated node to compile
+to an anonSafe section type. `page-login` compiles to nothing, so the root is
+replaced by an empty shell (`anon_tree_safety.py:170-200`). The catalog
+starter and the slot spec both put `template: "page-login"` on the root, so
+the documented shape can never be served; a V3 bug, radar row 28, reported
+to BE rather than worked around (dropping the root template would slip past
+the prune). `auth-brand-panel` on the panel node has the same problem, so the
+panel is tagged by `settings.slot` alone, which is the shape the hub's own
+fixtures and tests use.
+
+Also: `scripts/probe/auth-probe.mjs <slug> <login|register>` measures the live
+auth screen (h1 colour, panel colours, hub CSS vars) and saves a screenshot.
+Tests: 569. Radar v6 (28 rows).

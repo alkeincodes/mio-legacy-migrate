@@ -14,6 +14,8 @@ import { runAuthorizationChecks, type AuthzTarget, type Principal } from '../ver
 import { evaluateAcceptance, type AcceptanceVerdict } from '../verify/acceptance.js';
 import { writePlaybackReport, type PlaybackResult } from '../apply/playbackPrefilter.js';
 
+const AUTH_PAGE_TYPES = new Set(['login', 'register']);
+
 export async function runVerify(opts: {
   runId: string;
   profileName: string;
@@ -89,7 +91,8 @@ export async function runVerify(opts: {
   const sheet = contactSheetDecision({ shots: opts.shots === true, pendingAssets });
   if (sheet.capture) {
     await captureContactSheet({
-      env, slugs: plan.pages.map((p) => p.slug), legacyOrigin, v3Origin,
+      // Auth pages are served at /login and /register and redirect a signed-in member; no pair to shoot.
+      env, slugs: plan.pages.filter((p) => !AUTH_PAGE_TYPES.has(p.pageType)).map((p) => p.slug), legacyOrigin, v3Origin,
       hubTitle: plan.hub.title, runDir,
     });
   } else {

@@ -153,11 +153,17 @@ customer wants a team-only hub, that is a V3 admin decision after migration.
   Each is a `fidelity` warning with the legacy and V3 values.
 - Section padding is exact at desktop width. Legacy drops its default 50px to
   30px under 768px; the migrated page keeps the desktop value on mobile.
-- The V3 login screen paints its form column with the `secondary` colour,
-  which legacy uses as its text colour, so a hub whose legacy text is maroon
-  gets a maroon login panel. The hub pages read as legacy; only the auth
-  screen differs. A login-type page with a `brand-panel` slot could carry a
-  legacy-matching surface; the migration does not author one yet.
+- The login, register and onboarding screens take their brand panel from an
+  authored `login` page at `/sign-in` and a `register` page at `/sign-up`
+  (the route names are reserved slugs): legacy's panel background, side and
+  logo size carry over. V3's panel ink is only light or dark, an image
+  background is centred, the logo cannot be hidden, the register copy is
+  V3's own and onboarding always shows the login panel; each is a `fidelity`
+  warning (`auth.panel.*`, `auth.register.copy`, `auth.onboarding.background`).
+  Until the backend's anonymous prune accepts a `page-login` root
+  (`app/pages/anon_tree_safety.py` empties it today), the auth screen keeps
+  V3's solid primary panel even though the published tree carries the legacy
+  one; radar row 28.
 - Background position is dropped; V3 centres. Paragraph line-height is V3's 1.3
   against legacy's 1.5. A small legacy headline (h4, 18px) renders at 20px.
 

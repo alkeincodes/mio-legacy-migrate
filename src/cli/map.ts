@@ -5,7 +5,7 @@ import { fetchCatalog, validateTree } from '../map/catalog.js';
 import { mapBranding } from '../map/branding.js';
 import { dominantButtonColour } from '../map/style.js';
 import { homeMenuLabel, mapNavigation } from '../map/navigation.js';
-import { mapPages } from '../map/pages.js';
+import { DEFAULT_EXCLUDED_PAGE_TYPES, mapPages } from '../map/pages.js';
 import { mapSegment } from '../map/segments.js';
 import { SECTION_TABLE } from '../map/sectionTable.js';
 import { writePlan, type Plan, type PlanSegment, type PlanTag, type PlanWarning } from '../map/plan.js';
@@ -27,6 +27,12 @@ export interface MapOptions {
   excludePageTypes?: string[];
 }
 
+/** Pages whose menu items point at a built-in route, the authored login and register pages included. */
+function builtInRoutePageIds(bundle: { pages: Array<{ id: number; type: string }> }, excludePageTypes: readonly string[] | undefined): Set<number> {
+  const types = new Set(excludePageTypes ?? DEFAULT_EXCLUDED_PAGE_TYPES);
+  return new Set(bundle.pages.filter((pg) => types.has(pg.type)).map((pg) => pg.id));
+}
+
 export async function runMap(options: MapOptions): Promise<string> {
   const bundle = readBundle(options.bundlePath);
   const { catalog, digest } = await fetchCatalog(options.apiBase);
@@ -39,7 +45,7 @@ export async function runMap(options: MapOptions): Promise<string> {
   const homePage = pages.find((p) => p.isHomepage);
   const homeLabel = homeMenuLabel(parseJsonObject(bundle.theme?.settings));
   const { navigation, warnings: navWarnings } = mapNavigation(
-    bundle, slugByPageId, new Map(bundle.pages.map((pg) => [pg.id, pg.type])), new Set(excluded.map((e) => e.legacyPageId)),
+    bundle, slugByPageId, new Map(bundle.pages.map((pg) => [pg.id, pg.type])), builtInRoutePageIds(bundle, options.excludePageTypes),
     homePage && homeLabel ? { label: homeLabel, pageSlug: homePage.slug } : null,
   );
   warnings.push(...navWarnings);

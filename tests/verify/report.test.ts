@@ -55,6 +55,17 @@ describe('buildStructuralReport', () => {
     expect(report.pages[0]?.nodeCount).toBe(3);
   });
 
+  it('counts an untemplated slot region (the auth brand panel) as a section, since the target lists it as a root child', () => {
+    const base = plan();
+    const authPage = { ...base.pages[0]!, slug: 'sign-in', pageType: 'login', tree: { id: 'r', kind: 'stack', template: 'page-login', children: [{ id: 'p', kind: 'stack', settings: { slot: 'brand-panel' }, children: [] }] } };
+    const report = buildStructuralReport({
+      plan: { ...base, pages: [authPage] } as typeof base, store: store(),
+      live: { pages: [{ slug: 'sign-in', sectionCount: 1, publishedTreeDigest: null }], playlists: 0, folders: 0, files: 0 },
+    });
+    expect(report.pages[0]?.catalogSectionCount).toBe(1);
+    expect(report.pages[0]?.targetSectionCount).toBe(1);
+  });
+
   it('groups warnings by type per page and across the run', () => {
     const report = buildStructuralReport({
       plan: plan(), store: store(),

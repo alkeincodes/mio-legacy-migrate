@@ -78,7 +78,8 @@ export function buildStructuralReport(opts: {
       slug: page.slug,
       pageType: page.pageType,
       legacySectionCount: page.tree.children?.length ?? 0,
-      catalogSectionCount: (page.tree.children ?? []).filter((c) => c.template !== undefined).length,
+      // Sections carry a template; a slot region (the auth brand panel) carries none. Both are root children on the target.
+      catalogSectionCount: (page.tree.children ?? []).filter((c) => c.template !== undefined || c.settings?.['slot'] !== undefined).length,
       nodeCount: countNodes(page.tree),
       warningsByType: pageWarnings,
       targetSectionCount: liveRow?.sectionCount ?? null,
